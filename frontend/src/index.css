@@ -1,0 +1,222 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --bg-app: #f6f6f3;
+  --bg-panel: #ffffff;
+  --bg-muted: #f3f3ef;
+  --bg-hover: #ecece7;
+  --text-primary: #1f1f1d;
+  --text-secondary: #5f5e5a;
+  --border-soft: #e4e3dd;
+  --border-strong: #d7d6cf;
+  --accent: #2f2f2d;
+  --accent-contrast: #ffffff;
+  --danger: #b42318;
+  --focus-ring: rgba(47, 47, 45, 0.25);
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-app: #191919;
+  --bg-panel: #20201f;
+  --bg-muted: #242423;
+  --bg-hover: #2c2c2a;
+  --text-primary: #ecebe8;
+  --text-secondary: #b0afab;
+  --border-soft: #343432;
+  --border-strong: #40403d;
+  --accent: #ecebe8;
+  --accent-contrast: #1c1c1a;
+  --danger: #ff6a64;
+  --focus-ring: rgba(236, 235, 232, 0.24);
+}
+
+@layer base {
+  * {
+    border-color: var(--border-soft);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    text-rendering: geometricPrecision;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'] {
+    color-scheme: light dark;
+  }
+
+  .ui-datetime-input {
+    appearance: none;
+  }
+
+  .ui-datetime-input::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    width: 1.2rem;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .ui-datetime-input::-webkit-clear-button,
+  .ui-datetime-input::-webkit-inner-spin-button {
+    display: none;
+  }
+
+  .ui-datetime-icon {
+    color: var(--text-secondary);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-muted);
+  }
+
+  .ui-datetime-input:focus-visible + .ui-datetime-icon {
+    color: var(--text-primary);
+  }
+
+  .dark .ui-datetime-icon {
+    color: var(--text-primary);
+  }
+
+  .ui-datetime-input:disabled + .ui-datetime-icon {
+    opacity: 0.5;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-secondary);
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid transparent;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+}
+
+@layer components {
+  .ui-card {
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    background: var(--bg-panel);
+    box-shadow: 0 1px 2px rgba(15, 15, 15, 0.04);
+  }
+
+  .ui-muted-surface {
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+  }
+
+  .ui-text-muted {
+    color: var(--text-secondary);
+  }
+
+  .ui-input {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .ui-button {
+    min-height: 2.75rem;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.5rem 0.9rem;
+    transition: opacity 0.15s ease;
+  }
+
+  .ui-button:hover {
+    opacity: 0.9;
+  }
+
+  .ui-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .ui-button-muted {
+    min-height: 2.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.45rem 0.8rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .ui-button-muted:hover {
+    background: var(--bg-hover);
+  }
+
+  .ui-nav-link {
+    display: block;
+    border-radius: 10px;
+    min-height: 2.75rem;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .ui-nav-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .ui-nav-link-active {
+    background: var(--bg-muted);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .ui-icon {
+    color: currentColor;
+    flex-shrink: 0;
+  }
+
+  .dark .ui-icon {
+    color: var(--text-primary);
+  }
+
+  .dark .ui-text-muted .ui-icon,
+  .dark .ui-nav-link .ui-icon {
+    color: var(--text-secondary);
+  }
+
+  .dark .ui-nav-link-active .ui-icon,
+  .dark .ui-button .ui-icon,
+  .dark .ui-button-muted .ui-icon {
+    color: var(--text-primary);
+  }
+}
