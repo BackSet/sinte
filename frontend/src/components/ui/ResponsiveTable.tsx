@@ -23,26 +23,30 @@ export function ResponsiveTable<T>({
   renderMobileCard,
 }: ResponsiveTableProps<T>) {
   if (!data.length) {
-    return <p className="ui-text-muted text-sm" role="status">{emptyMessage}</p>
+    return (
+      <div className="ui-empty-state" role="status">
+        <p className="text-sm font-medium">{emptyMessage}</p>
+      </div>
+    )
   }
 
   return (
     <>
       <div className="space-y-3 md:hidden">
         {data.map((item) => (
-          <article key={rowKey(item)} className="ui-muted-surface p-3">
+          <article key={rowKey(item)} className="ui-muted-surface p-3 shadow-sm">
             {renderMobileCard(item)}
           </article>
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto rounded-lg border md:block">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Tabla de resultados</caption>
-          <thead>
+          <thead className="bg-[var(--bg-muted)]">
             <tr className="border-b text-[var(--text-secondary)]">
               {columns.map((column) => (
-                <th key={column.key} scope="col" className={`py-2 ${column.className ?? ''}`}>
+                <th key={column.key} scope="col" className={`px-3 py-2.5 text-xs font-semibold uppercase ${column.className ?? ''}`}>
                   {column.label}
                 </th>
               ))}
@@ -50,9 +54,9 @@ export function ResponsiveTable<T>({
           </thead>
           <tbody>
             {data.map((item) => (
-              <tr key={rowKey(item)} className="border-b align-top">
+              <tr key={rowKey(item)} className="border-b align-top transition hover:bg-[var(--bg-muted)]/70">
                 {columns.map((column) => (
-                  <td key={column.key} className={`py-2 ${column.className ?? ''}`}>
+                  <td key={column.key} className={`px-3 py-3 ${column.className ?? ''}`}>
                     {column.render(item)}
                   </td>
                 ))}

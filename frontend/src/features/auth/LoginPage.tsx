@@ -40,11 +40,37 @@ export function LoginPage() {
   }
 
   return (
-    <div className="ui-card mx-auto w-full max-w-md p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Iniciar sesion</h1>
-      <p className="ui-text-muted mt-2 text-sm">Accede al dashboard del sistema.</p>
+    <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[1fr_430px]">
+      <section className="hidden min-h-[520px] rounded-lg border bg-[var(--bg-panel)] p-8 shadow-sm lg:flex lg:flex-col lg:justify-between">
+        <div>
+          <span className="ui-badge ui-badge-info">Cancha sintetica</span>
+          <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-tight">Gestiona convocatorias, grupos y asistencia desde un solo panel.</h1>
+          <p className="ui-text-muted mt-4 max-w-lg text-sm">
+            Un espacio operativo para organizar partidos, confirmar jugadores y mantener al equipo informado.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="ui-kpi-card">
+            <p className="ui-text-muted text-xs">Roles</p>
+            <p className="mt-2 text-2xl font-semibold">3</p>
+          </div>
+          <div className="ui-kpi-card">
+            <p className="ui-text-muted text-xs">Flujos</p>
+            <p className="mt-2 text-2xl font-semibold">8</p>
+          </div>
+          <div className="ui-kpi-card">
+            <p className="ui-text-muted text-xs">Estado</p>
+            <p className="mt-2 text-sm font-semibold">En linea</p>
+          </div>
+        </div>
+      </section>
 
-      <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+      <section className="ui-card w-full p-6 sm:p-8">
+        <span className="ui-badge ui-badge-success">Acceso seguro</span>
+        <h1 className="mt-4 text-2xl font-semibold">Iniciar sesion</h1>
+        <p className="ui-text-muted mt-2 text-sm">Accede al dashboard del sistema.</p>
+
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="login-identifier">Correo o codigo jugador</label>
           <input
@@ -72,21 +98,24 @@ export function LoginPage() {
           <p className="text-sm text-red-600">{getApiErrorMessage(mutation.error, 'No se pudo iniciar sesion. Verifica tus credenciales.')}</p>
         )}
         {mutation.isSuccess && <p className="text-sm text-emerald-600">Sesion iniciada. Redirigiendo...</p>}
-        <button
-          className="ui-button w-full"
-          type="submit"
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending ? 'Ingresando...' : 'Ingresar'}
-        </button>
-      </form>
+          <button
+            className="ui-button w-full"
+            type="submit"
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? (
+              <span className="inline-flex items-center justify-center gap-2"><span className="ui-loader" /> Ingresando...</span>
+            ) : 'Ingresar'}
+          </button>
+        </form>
 
-      <p className="ui-text-muted mt-4 text-sm">
-        No tienes cuenta?{' '}
-        <Link className="font-medium underline" to="/register">
-          Registrate
-        </Link>
-      </p>
+        <p className="ui-text-muted mt-4 text-sm">
+          No tienes cuenta?{' '}
+          <Link className="font-medium text-[var(--accent)] underline" to="/register">
+            Registrate
+          </Link>
+        </p>
+      </section>
     </div>
   )
 }

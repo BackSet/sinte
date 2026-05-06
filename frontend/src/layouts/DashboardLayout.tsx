@@ -41,15 +41,21 @@ export function DashboardLayout() {
   })
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 md:grid-cols-[250px_1fr]">
-        <aside className="hidden border-r p-4 md:block" aria-label="Navegacion principal">
-          <Link className="mb-6 block text-lg font-semibold tracking-tight" to="/dashboard">
-            SINTE
+    <div className="min-h-screen bg-[var(--bg-app)]">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[272px_1fr]">
+        <aside className="sticky top-0 hidden h-screen border-r bg-[var(--bg-panel)]/90 p-4 backdrop-blur lg:block" aria-label="Navegacion principal">
+          <Link className="mb-6 flex items-center gap-3 rounded-lg px-2 py-2" to="/dashboard">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent)] text-sm font-bold text-[var(--accent-contrast)]">
+              ST
+            </span>
+            <span>
+              <span className="block text-lg font-semibold">SINTE</span>
+              <span className="ui-text-muted block text-xs">Reservas y convocatorias</span>
+            </span>
           </Link>
           <nav className="space-y-4" aria-label="Secciones">
             <div className="space-y-1.5">
-              <p className="ui-text-muted px-2 text-[11px] font-semibold uppercase tracking-wide">Jugador</p>
+              <p className="ui-text-muted px-2 text-[11px] font-semibold uppercase">Jugador</p>
               {playerLinks.map((link) => (
                 <NavLink
                   key={link.to}
@@ -68,7 +74,7 @@ export function DashboardLayout() {
 
             {managementLinks.length > 0 && (
               <div className="space-y-1.5">
-                <p className="ui-text-muted px-2 text-[11px] font-semibold uppercase tracking-wide">Gestion</p>
+                <p className="ui-text-muted px-2 text-[11px] font-semibold uppercase">Gestion</p>
                 {managementLinks.map((link) => (
                   <NavLink
                     key={link.to}
@@ -102,20 +108,20 @@ export function DashboardLayout() {
           </nav>
         </aside>
 
-        <main className="px-3 pb-24 pt-3 sm:px-4 md:px-6 md:pb-6 md:pt-6">
+        <main className="min-w-0 px-3 pb-24 pt-3 sm:px-4 lg:px-8 lg:pb-8 lg:pt-6">
           <h1 className="sr-only">Panel principal SINTE</h1>
-          <header className="ui-card mb-4 flex items-center justify-between px-3 py-3 sm:mb-6 sm:px-4">
-            <div>
-              <p className="ui-text-muted text-xs">Sesion activa</p>
-              <p className="text-sm font-medium">
-                {user?.fullName ?? 'Usuario'}
-                <span className="ui-text-muted ml-2 hidden text-xs sm:inline">
-                  ({user?.roles.join(', ') ?? 'sin rol'})
-                </span>
-              </p>
+          <header className="mb-5 flex items-center justify-between gap-3 rounded-lg border bg-[var(--bg-panel)]/90 px-3 py-3 shadow-sm backdrop-blur sm:px-4 lg:mb-6">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="ui-badge ui-badge-success">Activo</span>
+                <span className="ui-text-muted hidden text-xs sm:inline">{user?.roles.join(', ') ?? 'sin rol'}</span>
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold sm:text-base">{user?.fullName ?? 'Usuario'}</p>
             </div>
             <div className="flex items-center gap-2">
-              <ThemeToggle />
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
               <button className="ui-button-muted" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
                 <span className="inline-flex items-center gap-2">
                   <Icon name="logout" size="sm" />

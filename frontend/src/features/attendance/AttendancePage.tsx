@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type AttendanceItem = {
   id: string
@@ -46,6 +47,12 @@ export function AttendancePage() {
     return 'Pendiente'
   }
 
+  const attendanceTone = (status: AttendanceItem['status']) => {
+    if (status === 'YES') return 'success' as const
+    if (status === 'NO') return 'danger' as const
+    return 'warning' as const
+  }
+
   return (
     <ResponsiveSection
       title="Mi asistencia a partidos"
@@ -71,7 +78,13 @@ export function AttendancePage() {
                 </div>
               ),
             },
-            { key: 'status', label: 'Tu respuesta', render: (attendance) => formatAttendanceStatus(attendance.status) },
+            {
+              key: 'status',
+              label: 'Tu respuesta',
+              render: (attendance) => (
+                <StatusBadge label={formatAttendanceStatus(attendance.status)} tone={attendanceTone(attendance.status)} />
+              ),
+            },
             {
               key: 'quota',
               label: 'Convocatoria',
@@ -128,7 +141,7 @@ export function AttendancePage() {
             <div className="space-y-2 text-sm">
               <p className="font-semibold">{attendance.matchTitle}</p>
               <p className="ui-text-muted">Inicio: {new Date(attendance.matchStartsAt).toLocaleString()}</p>
-              <p className="ui-text-muted">Tu respuesta: {formatAttendanceStatus(attendance.status)}</p>
+              <p className="ui-text-muted">Tu respuesta: <StatusBadge label={formatAttendanceStatus(attendance.status)} tone={attendanceTone(attendance.status)} /></p>
               <p className="ui-text-muted">
                 Plantilla:{' '}
                 {attendance.targetPlayers

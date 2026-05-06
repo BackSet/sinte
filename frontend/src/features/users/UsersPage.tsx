@@ -7,6 +7,7 @@ import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
 import type { PlayerPosition } from '../../lib/player-positions'
 import { getApiErrorMessage } from '../../lib/api-client'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type UserItem = {
   id: string
@@ -127,7 +128,13 @@ export function UsersPage() {
               { key: 'handle', label: 'Codigo jugador', render: (user) => user.playerHandle ?? '-' },
               { key: 'position', label: 'Posiciones', render: (user) => `${user.primaryPosition ?? '-'} / ${user.secondaryPosition ?? '-'}` },
               { key: 'roles', label: 'Roles', render: (user) => user.roles.join(', ') || '-' },
-              { key: 'status', label: 'Estado', render: (user) => (user.active ? 'Activo' : 'Inactivo') },
+              {
+                key: 'status',
+                label: 'Estado',
+                render: (user) => (
+                  <StatusBadge label={user.active ? 'Activo' : 'Inactivo'} tone={user.active ? 'success' : 'neutral'} />
+                ),
+              },
               {
                 key: 'actions',
                 label: '',
@@ -151,9 +158,7 @@ export function UsersPage() {
                 <p className="ui-text-muted">Posiciones: {user.primaryPosition ?? '-'} / {user.secondaryPosition ?? '-'}</p>
                 <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
                 <div className="flex items-center justify-between gap-2 pt-1">
-                  <span className="ui-text-muted text-xs font-medium uppercase">
-                    {user.active ? 'Activo' : 'Inactivo'}
-                  </span>
+                  <StatusBadge label={user.active ? 'Activo' : 'Inactivo'} tone={user.active ? 'success' : 'neutral'} />
                   <button
                     className="ui-button-muted"
                     onClick={() => toggleMutation.mutate({ userId: user.id, active: user.active })}

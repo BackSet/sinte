@@ -58,8 +58,9 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="ui-card mx-auto w-full max-w-xl p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Crear cuenta</h1>
+    <div className="ui-card mx-auto w-full max-w-2xl p-6 sm:p-8">
+      <span className="ui-badge ui-badge-info">Nuevo jugador</span>
+      <h1 className="mt-4 text-2xl font-semibold">Crear cuenta</h1>
       <p className="ui-text-muted mt-2 text-sm">Registro de usuario para el sistema.</p>
 
       <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
@@ -151,14 +152,16 @@ export function RegisterPage() {
             type="submit"
             disabled={mutation.isPending || secondaryPosition === primaryPosition}
           >
-            {mutation.isPending ? 'Creando cuenta...' : 'Registrarme'}
+            {mutation.isPending ? (
+              <span className="inline-flex items-center justify-center gap-2"><span className="ui-loader" /> Creando cuenta...</span>
+            ) : 'Registrarme'}
           </button>
         </div>
       </form>
 
       <p className="ui-text-muted mt-4 text-sm">
         Ya tienes cuenta?{' '}
-        <Link className="font-medium underline" to="/login">
+        <Link className="font-medium text-[var(--accent)] underline" to="/login">
           Ir a login
         </Link>
       </p>

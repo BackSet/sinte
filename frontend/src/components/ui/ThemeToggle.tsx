@@ -11,13 +11,13 @@ export function ThemeToggle() {
   const setMode = useThemeStore((s) => s.setMode)
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-xl border px-1 py-1 ui-card">
+    <div className="inline-flex items-center gap-1 rounded-lg border bg-[var(--bg-muted)] p-1">
       {modes.map((item) => (
         <button
           key={item.value}
           type="button"
-          className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-            mode === item.value ? 'ui-nav-link-active' : 'ui-text-muted'
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+            mode === item.value ? 'bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-sm' : 'ui-text-muted'
           }`}
           onClick={() => setMode(item.value)}
         >

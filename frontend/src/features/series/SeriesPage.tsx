@@ -5,6 +5,7 @@ import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { DateTimeField } from '../../components/ui/DateTimeField'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type RecurrenceType = 'WEEKLY' | 'EVERY_N_DAYS' | 'MONTHLY_DAY_OF_MONTH'
 
@@ -464,7 +465,13 @@ export function SeriesPage() {
                 label: 'Regla',
                 render: (series) => series.rules.map((rule) => describeRule(rule)).join(' | '),
               },
-              { key: 'status', label: 'Estado', render: (series) => (series.active ? 'Activa' : 'Inactiva') },
+              {
+                key: 'status',
+                label: 'Estado',
+                render: (series) => (
+                  <StatusBadge label={series.active ? 'Activa' : 'Inactiva'} tone={series.active ? 'success' : 'neutral'} />
+                ),
+              },
               {
                 key: 'actions',
                 label: '',

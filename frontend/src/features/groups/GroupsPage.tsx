@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type GroupItem = {
   id: string
@@ -131,7 +132,13 @@ export function GroupsPage() {
             emptyMessage="No hay grupos registrados."
             columns={[
               { key: 'name', label: 'Nombre', render: (group) => group.name },
-              { key: 'status', label: 'Estado', render: (group) => (group.active ? 'Activo' : 'Inactivo') },
+              {
+                key: 'status',
+                label: 'Estado',
+                render: (group) => (
+                  <StatusBadge label={group.active ? 'Activo' : 'Inactivo'} tone={group.active ? 'success' : 'neutral'} />
+                ),
+              },
               {
                 key: 'select',
                 label: '',
@@ -157,7 +164,7 @@ export function GroupsPage() {
             renderMobileCard={(group) => (
               <div className="space-y-2 text-sm">
                 <p className="font-semibold">{group.name}</p>
-                <p className="ui-text-muted">{group.active ? 'Activo' : 'Inactivo'}</p>
+                <StatusBadge label={group.active ? 'Activo' : 'Inactivo'} tone={group.active ? 'success' : 'neutral'} />
                 <div className="flex flex-wrap gap-2">
                   <button className="ui-button-muted" onClick={() => setSelectedGroupId(group.id)}>
                     Ver miembros

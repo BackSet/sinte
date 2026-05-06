@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type EmailQueueItem = {
   id: string
@@ -53,7 +54,16 @@ export function AdminEmailQueuePage() {
           columns={[
             { key: 'to', label: 'Destino', render: (item) => item.toEmail },
             { key: 'subject', label: 'Asunto', render: (item) => item.subject },
-            { key: 'status', label: 'Estado', render: (item) => item.status },
+            {
+              key: 'status',
+              label: 'Estado',
+              render: (item) => (
+                <StatusBadge
+                  label={item.status}
+                  tone={item.status === 'SENT' ? 'success' : item.status === 'FAILED' ? 'danger' : 'warning'}
+                />
+              ),
+            },
             { key: 'attempts', label: 'Intentos', render: (item) => item.attemptCount },
             {
               key: 'error',
@@ -76,7 +86,11 @@ export function AdminEmailQueuePage() {
               <p className="font-semibold">{item.subject}</p>
               <p className="ui-text-muted">{item.toEmail}</p>
               <p className="ui-text-muted">
-                {item.status} | intentos: {item.attemptCount}
+                <StatusBadge
+                  label={item.status}
+                  tone={item.status === 'SENT' ? 'success' : item.status === 'FAILED' ? 'danger' : 'warning'}
+                />{' '}
+                intentos: {item.attemptCount}
               </p>
               <p className="ui-text-muted max-h-14 overflow-hidden text-xs">{item.lastError || 'Sin error'}</p>
               <button className="ui-button-muted" onClick={() => retryMutation.mutate(item.id)}>

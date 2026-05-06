@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type NotificationItem = {
   id: string
@@ -55,6 +56,7 @@ export function NotificationsPage() {
           <article key={notification.id} className={`rounded-lg border p-3 sm:p-4 ${notification.read ? 'ui-muted-surface' : 'ui-card'}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
+                <StatusBadge label={notification.read ? 'Leida' : 'Nueva'} tone={notification.read ? 'neutral' : 'info'} />
                 <p className="text-sm font-semibold">{notification.title}</p>
                 <p className="ui-text-muted mt-1 text-xs">{new Date(notification.createdAt).toLocaleString()}</p>
               </div>

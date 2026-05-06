@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type GroupMember = {
   userId: string
@@ -32,7 +33,7 @@ export function MyGroupsPage() {
           <article key={group.id} className="ui-card p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold">{group.name}</h3>
-              <span className="ui-text-muted text-xs">{group.members.length} miembro(s)</span>
+              <StatusBadge label={`${group.members.length} miembro(s)`} tone="info" />
             </div>
             <div className="mt-2 space-y-1 text-sm">
               {group.members.map((member) => (
@@ -44,7 +45,9 @@ export function MyGroupsPage() {
           </article>
         ))}
         {myGroupsQuery.data && myGroupsQuery.data.length === 0 && (
-          <p className="ui-text-muted text-sm">No perteneces a ningun grupo activo.</p>
+          <div className="ui-empty-state">
+            <p className="text-sm font-medium">No perteneces a ningun grupo activo.</p>
+          </div>
         )}
       </div>
     </ResponsiveSection>

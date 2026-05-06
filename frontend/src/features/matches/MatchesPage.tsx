@@ -6,6 +6,7 @@ import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { DateTimeField } from '../../components/ui/DateTimeField'
 import { useAuthStore } from '../../store/auth-store'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type MatchItem = {
   id: string
@@ -67,6 +68,12 @@ function formatDateTime(value?: string | null): string {
     return 'Sin hora fin'
   }
   return toDateTimeLocalValue(value).replace('T', ' ')
+}
+
+function matchStatusTone(status: string) {
+  if (status === 'SCHEDULED') return 'success' as const
+  if (status === 'CANCELLED') return 'danger' as const
+  return 'neutral' as const
 }
 
 export function MatchesPage() {
@@ -198,13 +205,12 @@ export function MatchesPage() {
 
   useEffect(() => {
     if (!teamsQuery.data) return
-    setDraftTeams(
-      teamsQuery.data.map((team) => ({
-        teamNumber: team.teamNumber,
-        name: team.name,
-        playerIds: team.players.map((player) => player.userId),
-      })),
-    )
+    const nextDraftTeams = teamsQuery.data.map((team) => ({
+      teamNumber: team.teamNumber,
+      name: team.name,
+      playerIds: team.players.map((player) => player.userId),
+    }))
+    queueMicrotask(() => setDraftTeams(nextDraftTeams))
   }, [teamsQuery.data])
 
   const toggleDraftPlayer = (teamNumber: number, playerId: string) => {
@@ -304,7 +310,7 @@ export function MatchesPage() {
               { key: 'location', label: 'Ubicacion', render: (match) => match.location ?? '-' },
               { key: 'start', label: 'Inicio', render: (match) => toDateTimeLocalValue(match.startsAt).replace('T', ' ') },
               { key: 'end', label: 'Fin', render: (match) => formatDateTime(match.endsAt) },
-              { key: 'status', label: 'Estado', render: (match) => match.status },
+              { key: 'status', label: 'Estado', render: (match) => <StatusBadge label={match.status} tone={matchStatusTone(match.status)} /> },
               ...(isManager
                 ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }]
                 : []),
@@ -367,8 +373,9 @@ export function MatchesPage() {
                   <p className="ui-text-muted text-xs">({match.targetGroups.map((group) => group.name).join(', ')})</p>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="ui-text-muted text-xs font-medium uppercase">
-                    {match.status} | {match.sourceType}
+                  <span className="flex flex-wrap gap-1">
+                    <StatusBadge label={match.status} tone={matchStatusTone(match.status)} />
+                    <StatusBadge label={match.sourceType} tone="info" />
                   </span>
                   {isManager && (
                     <button

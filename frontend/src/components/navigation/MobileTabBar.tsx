@@ -39,7 +39,7 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
   )
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-[var(--bg-panel)]/95 backdrop-blur md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-[var(--bg-panel)]/95 shadow-[0_-12px_32px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
       {openMore && (
         <div id="mobile-more-menu" className="ui-card mx-2 mb-2 p-2" role="menu" aria-label="Mas accesos">
           <div className="px-1 pb-2">
@@ -63,14 +63,14 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
         </div>
       )}
 
-      <nav className="grid grid-cols-6 gap-1 px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1" aria-label="Barra inferior">
+      <nav className="grid grid-cols-6 gap-1 px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1.5" aria-label="Barra inferior">
         {mainTabs.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `rounded-lg px-1 py-2.5 text-center text-[11px] font-medium ${
-                isActive ? 'ui-nav-link-active' : 'ui-text-muted'
+              `rounded-lg px-1 py-2 text-center text-[10px] font-semibold transition ${
+                isActive ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'ui-text-muted'
               }`
             }
             aria-label={tab.label}
@@ -84,8 +84,8 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
 
         <button
           type="button"
-          className={`rounded-lg px-1 py-2.5 text-center text-[11px] font-medium transition ${
-            openMore ? 'ui-nav-link-active' : 'ui-text-muted'
+          className={`rounded-lg px-1 py-2 text-center text-[10px] font-semibold transition ${
+            openMore ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]' : 'ui-text-muted'
           }`}
           onClick={() => setOpenMore((prev) => !prev)}
           aria-expanded={openMore}

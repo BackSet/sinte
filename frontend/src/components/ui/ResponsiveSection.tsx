@@ -8,15 +8,17 @@ type ResponsiveSectionProps = PropsWithChildren<{
 
 export function ResponsiveSection({ title, description, action, children }: ResponsiveSectionProps) {
   return (
-    <section className="ui-card p-4 sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="ui-card overflow-hidden">
+      <div className="border-b px-4 py-4 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:px-5">
         <div>
-          <h2 className="text-base font-semibold tracking-tight sm:text-lg">{title}</h2>
+          <h2 className="text-base font-semibold sm:text-lg">{title}</h2>
           {description ? <p className="ui-text-muted mt-1 text-sm">{description}</p> : null}
         </div>
-        {action}
+        {action ? <div className="mt-3 shrink-0 sm:mt-0">{action}</div> : null}
       </div>
-      {children}
+      <div className="p-4 sm:p-5">
+        {children}
+      </div>
     </section>
   )
 }

@@ -87,7 +87,7 @@ class GroupMatchTargetingIntegrationTest {
 
         List<MatchAttendance> attendance = matchAttendanceRepository.findByMatchIdOrderByStatusAsc(match.getId());
         assertThat(attendance).hasSize(1);
-        assertThat(attendance.getFirst().getUser().getId()).isEqualTo(playerInGroup.userId());
+        assertThat(attendance.get(0).getUser().getId()).isEqualTo(playerInGroup.userId());
 
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(playerInGroup.userId())).isNotEmpty();
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(playerOutGroup.userId())).isEmpty();

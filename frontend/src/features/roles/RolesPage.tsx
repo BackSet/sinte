@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 
 type RoleItem = { id: number; code: string; name: string }
 type UserItem = { id: string; fullName: string; roles: string[] }
@@ -68,12 +69,26 @@ export function RolesPage() {
             emptyMessage="Sin usuarios para mostrar."
             columns={[
               { key: 'user', label: 'Usuario', render: (user) => user.fullName },
-              { key: 'roles', label: 'Roles', render: (user) => user.roles.join(', ') || '-' },
+              {
+                key: 'roles',
+                label: 'Roles',
+                render: (user) => (
+                  <div className="flex flex-wrap gap-1">
+                    {user.roles.length
+                      ? user.roles.map((role) => <StatusBadge key={role} label={role} tone="info" />)
+                      : <span className="ui-text-muted">-</span>}
+                  </div>
+                ),
+              },
             ]}
             renderMobileCard={(user) => (
               <div className="space-y-1 text-sm">
                 <p className="font-semibold">{user.fullName}</p>
-                <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
+                <div className="flex flex-wrap gap-1">
+                  {user.roles.length
+                    ? user.roles.map((role) => <StatusBadge key={role} label={role} tone="info" />)
+                    : <span className="ui-text-muted">Sin roles</span>}
+                </div>
               </div>
             )}
           />
