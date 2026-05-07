@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { Modal } from '../../components/ui/Modal'
+import { FormField } from '../../components/ui/FormField'
 import { DateTimeField } from '../../components/ui/DateTimeField'
 import { GroupSelector } from '../../components/ui/GroupSelector'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -134,12 +135,8 @@ function toDateTimeLocalValue(value: string): string {
 }
 
 function isMatchClosed(match: MatchItem): boolean {
-  if (match.status !== 'SCHEDULED') {
-    return true
-  }
-  if (match.targetPlayers != null && match.confirmedCount >= match.targetPlayers) {
-    return true
-  }
+  if (match.status !== 'SCHEDULED') return true
+  if (match.targetPlayers != null && match.confirmedCount >= match.targetPlayers) return true
   return false
 }
 
@@ -155,6 +152,21 @@ function sourceTypeLabel(sourceType: string): string {
   return 'Manual'
 }
 
+function emptyMatchForm() {
+  return {
+    title: '',
+    description: '',
+    startsAt: '',
+    configLocation: '',
+    configTargetPlayers: DEFAULT_TARGET_PLAYERS,
+    configDurationMinutes: DEFAULT_DURATION_MINUTES,
+    configTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota',
+    targetGroupIds: [] as string[],
+  }
+}
+
+type DetailTab = 'roster' | 'teams' | 'guests'
+
 export function MatchesPage() {
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
@@ -162,20 +174,17 @@ export function MatchesPage() {
   const user = useAuthStore((state) => state.user)
   const canManageTeams = user?.roles.some((role) => role === 'DT' || role === 'ADMIN')
   const isManager = Boolean(canManageTeams)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [startsAt, setStartsAt] = useState('')
-  const [configLocation, setConfigLocation] = useState('')
-  const [configTargetPlayers, setConfigTargetPlayers] = useState(DEFAULT_TARGET_PLAYERS)
-  const [configDurationMinutes, setConfigDurationMinutes] = useState(DEFAULT_DURATION_MINUTES)
-  const [configTimezone, setConfigTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
-  const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
-  const [selectedMatchId, setSelectedMatchId] = useState<string>('')
+
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [selectedMatch, setSelectedMatch] = useState<MatchItem | null>(null)
+  const [detailTab, setDetailTab] = useState<DetailTab>('roster')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SCHEDULED' | 'CANCELLED'>('ALL')
   const [teamSize, setTeamSize] = useState(2)
   const [draftTeams, setDraftTeams] = useState<TeamDraft[]>([])
   const [guestFullName, setGuestFullName] = useState('')
   const [guestPositionCodes, setGuestPositionCodes] = useState<string[]>([])
+  const [matchForm, setMatchForm] = useState(emptyMatchForm())
 
   const matchesQuery = useQuery({
     queryKey: ['matches'],
@@ -183,78 +192,71 @@ export function MatchesPage() {
   })
 
   const guestsQuery = useQuery({
-    queryKey: ['match-guests', selectedMatchId],
-    queryFn: async () => (await apiClient.get<GuestPlayerItem[]>(`/api/v1/matches/${selectedMatchId}/guest-players`)).data,
-    enabled: Boolean(selectedMatchId) && isManager,
+    queryKey: ['match-guests', selectedMatch?.id],
+    queryFn: async () => (await apiClient.get<GuestPlayerItem[]>(`/api/v1/matches/${selectedMatch!.id}/guest-players`)).data,
+    enabled: Boolean(selectedMatch) && isManager,
   })
 
   const confirmedQuery = useQuery({
-    queryKey: ['match-confirmed', selectedMatchId],
+    queryKey: ['match-confirmed', selectedMatch?.id],
     queryFn: async () => {
-      const res = await apiClient.get<ConfirmedPlayersResponse>(`/api/v1/matches/${selectedMatchId}/confirmed`)
+      const res = await apiClient.get<ConfirmedPlayersResponse>(`/api/v1/matches/${selectedMatch!.id}/confirmed`)
       return res.data.players
     },
-    enabled: Boolean(selectedMatchId),
+    enabled: Boolean(selectedMatch),
   })
 
   const teamsQuery = useQuery({
-    queryKey: ['match-teams', selectedMatchId],
-    queryFn: async () => (await apiClient.get<Team[]>(`/api/v1/matches/${selectedMatchId}/teams`)).data,
-    enabled: Boolean(selectedMatchId),
+    queryKey: ['match-teams', selectedMatch?.id],
+    queryFn: async () => (await apiClient.get<Team[]>(`/api/v1/matches/${selectedMatch!.id}/teams`)).data,
+    enabled: Boolean(selectedMatch),
   })
 
   const rosterQuery = useQuery({
-    queryKey: ['match-roster', selectedMatchId],
-    queryFn: async () =>
-      (await apiClient.get<RosterResponse>(`/api/v1/matches/${selectedMatchId}/roster`)).data,
-    enabled: Boolean(selectedMatchId),
+    queryKey: ['match-roster', selectedMatch?.id],
+    queryFn: async () => (await apiClient.get<RosterResponse>(`/api/v1/matches/${selectedMatch!.id}/roster`)).data,
+    enabled: Boolean(selectedMatch),
   })
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const configResponse = await apiClient.post<MatchConfigItem>('/api/v1/configs', {
-        location: configLocation || null,
-        targetPlayers: configTargetPlayers,
-        durationMinutes: configDurationMinutes,
-        timezone: configTimezone,
-        description: description || null,
+        location: matchForm.configLocation || null,
+        targetPlayers: matchForm.configTargetPlayers,
+        durationMinutes: matchForm.configDurationMinutes,
+        timezone: matchForm.configTimezone,
+        description: matchForm.description || null,
       })
-      const configId = configResponse.data.id
       await apiClient.post('/api/v1/matches', {
-        configId,
-        title: title.trim() || null,
-        description: description || null,
-        startsAt: new Date(startsAt).toISOString(),
-        targetGroupIds,
+        configId: configResponse.data.id,
+        title: matchForm.title.trim() || null,
+        description: matchForm.description || null,
+        startsAt: new Date(matchForm.startsAt).toISOString(),
+        targetGroupIds: matchForm.targetGroupIds,
       })
     },
     onSuccess: () => {
-      setTitle('')
-      setDescription('')
-      setStartsAt('')
-      setConfigLocation('')
-      setConfigTargetPlayers(DEFAULT_TARGET_PLAYERS)
-      setConfigDurationMinutes(DEFAULT_DURATION_MINUTES)
-      setConfigTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
-      setTargetGroupIds([])
       addToast('success', 'Partido creado correctamente')
       queryClient.invalidateQueries({ queryKey: ['matches'] })
+      setCreateModalOpen(false)
+      setMatchForm(emptyMatchForm())
     },
-    onError: (error) => {
-      addToast('error', getApiErrorMessage(error, 'No se pudo crear el partido'))
-    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo crear el partido')),
   })
 
   const cancelMutation = useMutation({
     mutationFn: async (matchId: string) => {
       await apiClient.delete(`/api/v1/matches/${matchId}`)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['matches'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
+      setDetailModalOpen(false)
+    },
   })
 
   const suggestTeamsMutation = useMutation({
     mutationFn: async () =>
-      (await apiClient.post<Team[]>(`/api/v1/matches/${selectedMatchId}/teams/suggest?teamSize=${teamSize}`)).data,
+      (await apiClient.post<Team[]>(`/api/v1/matches/${selectedMatch!.id}/teams/suggest?teamSize=${teamSize}`)).data,
     onSuccess: (teams) => {
       setDraftTeams(
         teams.map((team) => ({
@@ -264,13 +266,13 @@ export function MatchesPage() {
           guestPlayerIds: team.players.filter((p) => p.guestPlayerId).map((p) => p.guestPlayerId!),
         })),
       )
-      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
     },
   })
 
   const saveTeamsMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.put(`/api/v1/matches/${selectedMatchId}/teams`, {
+      await apiClient.put(`/api/v1/matches/${selectedMatch!.id}/teams`, {
         teams: draftTeams.map((team) => ({
           teamNumber: team.teamNumber,
           name: team.name,
@@ -280,18 +282,14 @@ export function MatchesPage() {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
     },
   })
 
   const exportConfirmedMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const response = await apiClient.get(`/api/v1/matches/${matchId}/confirmed/export`, {
-        responseType: 'blob',
-      })
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      })
+      const response = await apiClient.get(`/api/v1/matches/${matchId}/confirmed/export`, { responseType: 'blob' })
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = window.URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
@@ -303,7 +301,7 @@ export function MatchesPage() {
 
   const createGuestMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post(`/api/v1/matches/${selectedMatchId}/guest-players`, {
+      await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/guest-players`, {
         fullName: guestFullName.trim(),
         positionCodes: guestPositionCodes.length > 0 ? guestPositionCodes : undefined,
       })
@@ -312,34 +310,34 @@ export function MatchesPage() {
       setGuestFullName('')
       setGuestPositionCodes([])
       addToast('success', 'Invitado agregado')
-      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo agregar invitado')),
   })
 
   const updateGuestStatusMutation = useMutation({
     mutationFn: async ({ guestId, status }: { guestId: string; status: string }) => {
-      await apiClient.put(`/api/v1/matches/${selectedMatchId}/guest-players/${guestId}/attendance`, { status })
+      await apiClient.put(`/api/v1/matches/${selectedMatch!.id}/guest-players/${guestId}/attendance`, { status })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo actualizar invitado')),
   })
 
   const deleteGuestMutation = useMutation({
     mutationFn: async (guestId: string) => {
-      await apiClient.delete(`/api/v1/matches/${selectedMatchId}/guest-players/${guestId}`)
+      await apiClient.delete(`/api/v1/matches/${selectedMatch!.id}/guest-players/${guestId}`)
     },
     onSuccess: () => {
       addToast('success', 'Invitado eliminado')
-      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
-      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar invitado')),
   })
@@ -350,15 +348,13 @@ export function MatchesPage() {
     )
   }
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    createMutation.mutate()
-  }
-
   const toggleGroup = (groupId: string) => {
-    setTargetGroupIds((current) =>
-      current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId],
-    )
+    setMatchForm((prev) => ({
+      ...prev,
+      targetGroupIds: prev.targetGroupIds.includes(groupId)
+        ? prev.targetGroupIds.filter((id) => id !== groupId)
+        : [...prev.targetGroupIds, groupId],
+    }))
   }
 
   useEffect(() => {
@@ -372,6 +368,12 @@ export function MatchesPage() {
       })),
     )
   }, [teamsQuery.data])
+
+  const openDetail = (match: MatchItem) => {
+    setSelectedMatch(match)
+    setDetailTab('roster')
+    setDetailModalOpen(true)
+  }
 
   const handleCancelMatch = async (match: MatchItem) => {
     const confirmed = await requestConfirm({
@@ -397,22 +399,15 @@ export function MatchesPage() {
         }
         if (isGuest) {
           const exists = team.guestPlayerIds.includes(playerId)
-          return {
-            ...team,
-            guestPlayerIds: exists ? team.guestPlayerIds.filter((id) => id !== playerId) : [...team.guestPlayerIds, playerId],
-          }
+          return { ...team, guestPlayerIds: exists ? team.guestPlayerIds.filter((id) => id !== playerId) : [...team.guestPlayerIds, playerId] }
         } else {
           const exists = team.playerIds.includes(playerId)
-          return {
-            ...team,
-            playerIds: exists ? team.playerIds.filter((id) => id !== playerId) : [...team.playerIds, playerId],
-          }
+          return { ...team, playerIds: exists ? team.playerIds.filter((id) => id !== playerId) : [...team.playerIds, playerId] }
         }
       }),
     )
   }
 
-  const selectedMatch = matchesQuery.data?.find((match) => match.id === selectedMatchId)
   const visibleMatches = (matchesQuery.data ?? []).filter((match) =>
     statusFilter === 'ALL' ? true : match.status === statusFilter,
   )
@@ -422,133 +417,26 @@ export function MatchesPage() {
     (p) => p.userId && !assignedPlayerIds.has(p.userId) && !assignedGuestIds.has(p.guestPlayerId ?? ''),
   )
 
+  const detailTabs = [
+    { label: 'Roster', active: detailTab === 'roster', onClick: () => setDetailTab('roster') },
+    ...(canManageTeams ? [{ label: 'Equipos', active: detailTab === 'teams', onClick: () => setDetailTab('teams') }] : []),
+    ...(isManager ? [{ label: 'Invitados', active: detailTab === 'guests', onClick: () => setDetailTab('guests') }] : []),
+  ]
+
   return (
     <div className="space-y-6">
       {ConfirmDialogComponent}
 
       {isManager && (
         <ResponsiveSection
-          title="Crear partido manual"
-          description="Alternativa rapida a una serie. El partido cierra automaticamente al llenar la plantilla."
-        >
-          <form className="mt-4 space-y-5" onSubmit={onSubmit}>
-            <div className="ui-section-card space-y-3">
-              <div className="ui-section-header">
-                <h3>Datos del partido</h3>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="ui-text-muted mb-1 block text-xs">Titulo</label>
-                  <input
-                    className="ui-input"
-                    placeholder="Ej: Partido sabado"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="ui-text-muted mb-1 block text-xs">Fecha y hora del encuentro</label>
-                  <DateTimeField
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={(e) => setStartsAt(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="ui-text-muted mb-1 block text-xs">Descripcion (opcional)</label>
-                  <textarea
-                    className="ui-input"
-                    placeholder="Notas para los jugadores"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="ui-section-card space-y-3">
-              <div className="ui-section-header">
-                <h3>Configuracion de plantilla</h3>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <label className="ui-text-muted mb-1 block text-xs">Ubicacion</label>
-                  <input
-                    className="ui-input"
-                    placeholder="Cancha principal"
-                    value={configLocation}
-                    onChange={(e) => setConfigLocation(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="ui-text-muted mb-1 block text-xs">Plantilla objetivo</label>
-                  <input
-                    className="ui-input"
-                    type="number"
-                    min={1}
-                    value={configTargetPlayers}
-                    onChange={(e) =>
-                      setConfigTargetPlayers(Math.max(1, Math.trunc(Number(e.target.value) || 1)))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="ui-text-muted mb-1 block text-xs">Duracion (minutos)</label>
-                  <input
-                    className="ui-input"
-                    type="number"
-                    min={1}
-                    value={configDurationMinutes}
-                    onChange={(e) =>
-                      setConfigDurationMinutes(Math.max(1, Math.trunc(Number(e.target.value) || 1)))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="ui-text-muted mb-1 block text-xs">Zona horaria</label>
-                  <select className="ui-input" value={configTimezone} onChange={(e) => setConfigTimezone(e.target.value)} required>
-                    {timezoneOptions.map((zone) => (
-                      <option key={zone} value={zone}>
-                        {zone}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <p className="ui-text-muted text-xs">
-                El partido cierra automaticamente al alcanzar la plantilla objetivo. Al llegar la fecha del encuentro se cierra y no se puede modificar.
-              </p>
-            </div>
-
-            <div className="ui-section-card space-y-3">
-              <div className="ui-section-header">
-                <h3>Grupos objetivo</h3>
-                <p>Opcional</p>
-              </div>
-              <GroupSelector
-                selectedGroupIds={targetGroupIds}
-                onToggleGroup={toggleGroup}
-              />
-              <p className="ui-text-muted text-xs">
-                Si no seleccionas grupos, la convocatoria se enviara a todos los jugadores activos.
-              </p>
-            </div>
-
-            <button className="ui-button" type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creando...' : 'Crear partido'}
+          title="Partidos"
+          description="Gestiona convocatorias y partidos manuales"
+          action={
+            <button className="ui-button" onClick={() => setCreateModalOpen(true)}>
+              Nuevo partido
             </button>
-            {createMutation.isError && (
-              <p className="text-sm text-[var(--danger)]">
-                {getApiErrorMessage(createMutation.error, 'No se pudo crear el partido.')}
-              </p>
-            )}
-          </form>
-        </ResponsiveSection>
+          }
+        />
       )}
 
       <ResponsiveSection
@@ -569,7 +457,7 @@ export function MatchesPage() {
       >
         {matchesQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando partidos...</p>}
         {matchesQuery.isError && (
-          <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar los partidos. Intenta nuevamente.</p>
+          <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar los partidos.</p>
         )}
         {matchesQuery.data && (
           <ResponsiveTable
@@ -580,28 +468,14 @@ export function MatchesPage() {
               { key: 'title', label: 'Titulo', render: (match) => match.title },
               { key: 'location', label: 'Ubicacion', render: (match) => match.location ?? '-' },
               { key: 'start', label: 'Inicio', render: (match) => toDateTimeLocalValue(match.startsAt).replace('T', ' ') },
-              {
-                key: 'status',
-                label: 'Estado',
-                render: (match) => statusLabel(match),
-              },
-              ...(isManager
-                ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }]
-                : []),
-              {
-                key: 'roster',
-                label: 'Plantilla',
-                render: (match) =>
-                  `${match.confirmedCount} / ${match.targetPlayers ?? '-'}`,
-              },
+              { key: 'status', label: 'Estado', render: (match) => statusLabel(match) },
+              ...(isManager ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }] : []),
+              { key: 'roster', label: 'Plantilla', render: (match) => `${match.confirmedCount} / ${match.targetPlayers ?? '-'}` },
               { key: 'source', label: 'Origen', render: (match) => sourceTypeLabel(match.sourceType) },
-              {
-                key: 'groups',
-                label: 'Grupos',
-                render: (match) =>
-                  match.targetGroups && match.targetGroups.length > 0
-                    ? match.targetGroups.map((group) => group.name).join(', ')
-                    : 'Todos',
+              { key: 'groups', label: 'Grupos', render: (match) =>
+                match.targetGroups && match.targetGroups.length > 0
+                  ? match.targetGroups.map((group) => group.name).join(', ')
+                  : 'Todos'
               },
               {
                 key: 'actions',
@@ -609,24 +483,14 @@ export function MatchesPage() {
                 className: 'text-right',
                 render: (match) => (
                   <div className="flex justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => setSelectedMatchId(match.id)}>
-                      Ver detalle
-                    </button>
+                    <button className="ui-button-muted" onClick={() => openDetail(match)}>Ver detalle</button>
                     {isManager && (
-                      <button
-                        className="ui-button-muted"
-                        onClick={() => handleCancelMatch(match)}
-                        disabled={match.status === 'CANCELLED' || cancelMutation.isPending}
-                      >
+                      <button className="ui-button-muted" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending}>
                         {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
                       </button>
                     )}
                     {canManageTeams && (
-                      <button
-                        className="ui-button-muted"
-                        onClick={() => exportConfirmedMutation.mutate(match.id)}
-                        disabled={exportConfirmedMutation.isPending}
-                      >
+                      <button className="ui-button-muted" onClick={() => exportConfirmedMutation.mutate(match.id)} disabled={exportConfirmedMutation.isPending}>
                         {exportConfirmedMutation.isPending ? 'Exportando...' : 'Exportar'}
                       </button>
                     )}
@@ -639,37 +503,22 @@ export function MatchesPage() {
                 <p className="font-semibold">{match.title}</p>
                 <p className="ui-text-muted">Ubicacion: {match.location ?? '-'}</p>
                 <p className="ui-text-muted">Inicio: {toDateTimeLocalValue(match.startsAt).replace('T', ' ')}</p>
-                <p className="ui-text-muted">
-                  Plantilla: {match.confirmedCount} / {match.targetPlayers ?? '-'}
-                  {isMatchClosed(match) && match.status === 'SCHEDULED' ? ' (Cerrado)' : ''}
-                </p>
-                <p className="ui-text-muted">
-                  Origen: {sourceTypeLabel(match.sourceType)}
-                </p>
-                <p className="ui-text-muted">
-                  Grupos objetivo: {match.targetGroupIds && match.targetGroupIds.length > 0 ? match.targetGroupIds.length : 'Todos'}
-                </p>
+                <p className="ui-text-muted">Plantilla: {match.confirmedCount} / {match.targetPlayers ?? '-'}{isMatchClosed(match) && match.status === 'SCHEDULED' ? ' (Cerrado)' : ''}</p>
+                <p className="ui-text-muted">Origen: {sourceTypeLabel(match.sourceType)}</p>
+                <p className="ui-text-muted">Grupos: {match.targetGroupIds && match.targetGroupIds.length > 0 ? match.targetGroupIds.length : 'Todos'}</p>
                 {match.targetGroups && match.targetGroups.length > 0 && (
                   <p className="ui-text-muted text-xs">({match.targetGroups.map((group) => group.name).join(', ')})</p>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="ui-text-muted text-xs font-medium uppercase">
-                    {statusLabel(match)} | {sourceTypeLabel(match.sourceType)}
-                  </span>
+                  <span className="ui-text-muted text-xs font-medium uppercase">{statusLabel(match)} | {sourceTypeLabel(match.sourceType)}</span>
                   {isManager && (
-                    <button
-                      className="ui-button-muted"
-                      onClick={() => handleCancelMatch(match)}
-                      disabled={match.status === 'CANCELLED' || cancelMutation.isPending}
-                    >
+                    <button className="ui-button-muted" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending}>
                       {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
                     </button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="ui-button-muted" onClick={() => setSelectedMatchId(match.id)}>
-                    Ver detalle
-                  </button>
+                  <button className="ui-button-muted" onClick={() => openDetail(match)}>Ver detalle</button>
                   {canManageTeams && (
                     <button className="ui-button-muted" onClick={() => exportConfirmedMutation.mutate(match.id)}>
                       {exportConfirmedMutation.isPending ? 'Exportando...' : 'Exportar'}
@@ -682,328 +531,290 @@ export function MatchesPage() {
         )}
         {(cancelMutation.isError || exportConfirmedMutation.isError) && (
           <p className="mt-3 text-sm text-[var(--danger)]">
-            {getApiErrorMessage(
-              cancelMutation.error ?? exportConfirmedMutation.error,
-              'No se pudo completar la accion solicitada.',
-            )}
+            {getApiErrorMessage(cancelMutation.error ?? exportConfirmedMutation.error, 'No se pudo completar la accion.')}
           </p>
         )}
       </ResponsiveSection>
 
-      {selectedMatchId && (
-        <ResponsiveSection
-          title="Detalle de convocatoria"
-          description={
-            selectedMatch
-              ? `${selectedMatch.title} - ${toDateTimeLocalValue(selectedMatch.startsAt).replace('T', ' ')}`
-              : 'Partido seleccionado'
-          }
+      {/* Create Match Modal */}
+      {isManager && (
+        <Modal
+          open={createModalOpen}
+          onClose={() => { setCreateModalOpen(false); setMatchForm(emptyMatchForm()); }}
+          size="lg"
+          title="Nuevo partido"
+          subtitle="Alternativa rapida a una serie"
         >
-          <div className="space-y-5">
-            {rosterQuery.data && (
-              <>
-                <div className="ui-section-card">
-                  <div className="ui-section-header">
-                    <h3>Plantilla titular</h3>
-                    <p>{rosterQuery.data.roster.length} / {selectedMatch?.targetPlayers ?? '-'}</p>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    {rosterQuery.data.roster.map((p) => {
-                      const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
-                      return (
-                        <p key={key} className="ui-text-muted">
-                          {p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''} — {positionLabel(p.primaryPositionCode)}
-                          {p.guestPlayerId ? ' [Invitado]' : ''}
-                        </p>
-                      )
-                    })}
-                    {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted">Aun no hay titulares.</p>}
-                  </div>
-                </div>
+          <div className="ui-detail-section">
+            <p className="ui-detail-section-title">Datos del partido</p>
+            <FormField label="Titulo">
+              <input className="ui-input" placeholder="Ej: Partido sabado" value={matchForm.title} onChange={(e) => setMatchForm({ ...matchForm, title: e.target.value })} required />
+            </FormField>
+            <FormField label="Fecha y hora">
+              <DateTimeField type="datetime-local" value={matchForm.startsAt} onChange={(e) => setMatchForm({ ...matchForm, startsAt: e.target.value })} required />
+            </FormField>
+            <FormField label="Descripcion (opcional)">
+              <textarea className="ui-input" placeholder="Notas para los jugadores" value={matchForm.description} onChange={(e) => setMatchForm({ ...matchForm, description: e.target.value })} rows={3} />
+            </FormField>
+          </div>
 
-                {rosterQuery.data.waitlist.length > 0 && (
-                  <div className="ui-section-card">
-                    <div className="ui-section-header">
-                      <h3>Lista de espera</h3>
-                      <p>{rosterQuery.data.waitlist.length}</p>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      {rosterQuery.data.waitlist.map((p) => {
+          <hr className="ui-section-divider" />
+
+          <div className="ui-detail-section">
+            <p className="ui-detail-section-title">Configuracion de plantilla</p>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Ubicacion">
+                <input className="ui-input" placeholder="Cancha principal" value={matchForm.configLocation} onChange={(e) => setMatchForm({ ...matchForm, configLocation: e.target.value })} required />
+              </FormField>
+              <FormField label="Plantilla objetivo">
+                <input className="ui-input" type="number" min={1} value={matchForm.configTargetPlayers} onChange={(e) => setMatchForm({ ...matchForm, configTargetPlayers: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} required />
+              </FormField>
+              <FormField label="Duracion (minutos)">
+                <input className="ui-input" type="number" min={1} value={matchForm.configDurationMinutes} onChange={(e) => setMatchForm({ ...matchForm, configDurationMinutes: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} required />
+              </FormField>
+              <FormField label="Zona horaria">
+                <select className="ui-input" value={matchForm.configTimezone} onChange={(e) => setMatchForm({ ...matchForm, configTimezone: e.target.value })} required>
+                  {timezoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+                </select>
+              </FormField>
+            </div>
+            <p className="ui-form-hint mt-2">El partido cierra automaticamente al alcanzar la plantilla objetivo.</p>
+          </div>
+
+          <hr className="ui-section-divider" />
+
+          <div className="ui-detail-section">
+            <p className="ui-detail-section-title">Grupos objetivo</p>
+            <p className="ui-form-hint mb-2">Opcional. Si no seleccionas grupos, la convocatoria se enviara a todos los jugadores activos.</p>
+            <GroupSelector selectedGroupIds={matchForm.targetGroupIds} onToggleGroup={toggleGroup} />
+          </div>
+
+          {createMutation.isError && (
+            <p className="text-sm text-[var(--danger)]">
+              {getApiErrorMessage(createMutation.error, 'No se pudo crear el partido.')}
+            </p>
+          )}
+
+          <Modal.Footer>
+            <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setMatchForm(emptyMatchForm()); }}>
+              Cancelar
+            </button>
+            <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !matchForm.title.trim() || !matchForm.startsAt || !matchForm.configLocation}>
+              {createMutation.isPending ? 'Creando...' : 'Crear partido'}
+            </button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Detail Modal */}
+      {selectedMatch && (
+        <Modal
+          open={detailModalOpen}
+          onClose={() => { setDetailModalOpen(false); setSelectedMatch(null); }}
+          size="xl"
+          title={selectedMatch.title}
+          subtitle={`${toDateTimeLocalValue(selectedMatch.startsAt).replace('T', ' ')} — ${statusLabel(selectedMatch)}`}
+          tabs={detailTabs}
+        >
+          {/* Roster Tab */}
+          {detailTab === 'roster' && (
+            <div className="space-y-4">
+              {rosterQuery.data ? (
+                <>
+                  <div className="ui-detail-section">
+                    <p className="ui-detail-section-title">Titulares ({rosterQuery.data.roster.length} / {selectedMatch.targetPlayers ?? '-'})</p>
+                    {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted text-sm">Aun no hay titulares.</p>}
+                    <div className="space-y-1">
+                      {rosterQuery.data.roster.map((p) => {
                         const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
                         return (
-                          <p key={key} className="ui-text-muted">
-                            {p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''} — {positionLabel(p.primaryPositionCode)}
-                            {p.guestPlayerId ? ' [Invitado]' : ''}
-                          </p>
+                          <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                            <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
+                            <span className="ui-text-muted text-xs">
+                              {positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}
+                            </span>
+                          </div>
                         )
                       })}
                     </div>
                   </div>
-                )}
 
-                {rosterQuery.data.cancelled.length > 0 && (
-                  <div className="ui-section-card">
-                    <div className="ui-section-header">
-                      <h3>Cancelaron</h3>
-                      <p>{rosterQuery.data.cancelled.length}</p>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      {rosterQuery.data.cancelled.map((p) => {
-                        const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
-                        return <p key={key} className="ui-text-muted">{p.fullName}{p.guestPlayerId ? ' [Invitado]' : ''}</p>
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            {!rosterQuery.data && confirmedQuery.data && (
-              <div className="ui-section-card">
-                <div className="ui-section-header">
-                  <h3>Jugadores confirmados</h3>
-                  <p>{confirmedQuery.data.length} / {selectedMatch?.targetPlayers ?? '-'}</p>
-                </div>
-                <div className="space-y-1 text-sm">
-                  {confirmedQuery.data.map((player) => {
-                    const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
-                    return (
-                      <p key={key} className="ui-text-muted">
-                        {player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' [Invitado]' : ''}
-                      </p>
-                    )
-                  })}
-                  {confirmedQuery.isLoading && <p className="ui-text-muted">Cargando confirmados...</p>}
-                  {confirmedQuery.isError && <p className="text-sm text-[var(--danger)]">No se pudieron cargar confirmados.</p>}
-                </div>
-              </div>
-            )}
-
-            {canManageTeams && (
-              <div className="ui-section-card space-y-3">
-                <div className="ui-section-header">
-                  <h3>Armado de equipos</h3>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-sm">Tamano de equipo:</label>
-                  <input
-                    className="ui-input w-24"
-                    type="number"
-                    min={1}
-                    value={teamSize}
-                    onChange={(event) => setTeamSize(Math.max(1, Number(event.target.value)))}
-                  />
-                  <button className="ui-button-muted" onClick={() => suggestTeamsMutation.mutate()}>
-                    {suggestTeamsMutation.isPending ? 'Sugiriendo...' : 'Sugerir equipos'}
-                  </button>
-                  <button className="ui-button" onClick={() => saveTeamsMutation.mutate()} disabled={draftTeams.length === 0}>
-                    {saveTeamsMutation.isPending ? 'Guardando...' : 'Guardar equipos'}
-                  </button>
-                </div>
-                {(suggestTeamsMutation.isError || saveTeamsMutation.isError) && (
-                  <p className="text-sm text-[var(--danger)]">
-                    {getApiErrorMessage(
-                      suggestTeamsMutation.error ?? saveTeamsMutation.error,
-                      'No se pudo completar la operacion de equipos.',
-                    )}
-                  </p>
-                )}
-
-                <div className="space-y-3">
-                  <div className="ui-muted-surface rounded-lg p-3">
-                    <p className="text-sm font-medium">Sin asignar ({unassignedPlayers.length})</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {unassignedPlayers.map((player) => {
-                        const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
-                        return (
-                          <span key={key} className="rounded-md border px-2 py-1 text-xs">
-                            {player.fullName}{player.guestPlayerId ? ' (Inv.)' : ''}
-                          </span>
-                        )
-                      })}
-                      {unassignedPlayers.length === 0 && <span className="ui-text-muted text-xs">Todos los jugadores estan asignados.</span>}
-                    </div>
-                  </div>
-                  {draftTeams.map((team) => (
-                    <div key={team.teamNumber} className="ui-muted-surface rounded-lg p-3">
-                      <div className="mb-2 flex items-center gap-2">
-                        <input
-                          className="ui-input"
-                          value={team.name}
-                          onChange={(event) =>
-                            setDraftTeams((current) =>
-                              current.map((item) =>
-                                item.teamNumber === team.teamNumber
-                                  ? { ...item, name: event.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                        {(confirmedQuery.data ?? []).map((player) => {
-                          const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
-                          const isGuest = Boolean(player.guestPlayerId)
-                          const playerId = isGuest ? player.guestPlayerId : player.userId
-                          const isInTeam = isGuest
-                            ? team.guestPlayerIds.includes(playerId!)
-                            : team.playerIds.includes(playerId!)
+                  {rosterQuery.data.waitlist.length > 0 && (
+                    <div className="ui-detail-section">
+                      <p className="ui-detail-section-title">Lista de espera ({rosterQuery.data.waitlist.length})</p>
+                      <div className="space-y-1">
+                        {rosterQuery.data.waitlist.map((p) => {
+                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
                           return (
-                            <label key={key} className="inline-flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={isInTeam}
-                                onChange={() => toggleDraftPlayer(team.teamNumber, playerId!, isGuest)}
-                              />
-                              <span>
-                                {player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{isGuest ? ' [Inv.]' : ''}
-                              </span>
-                            </label>
+                            <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                              <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
+                              <span className="ui-text-muted text-xs">{positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}</span>
+                            </div>
                           )
                         })}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {rosterQuery.data.cancelled.length > 0 && (
+                    <div className="ui-detail-section">
+                      <p className="ui-detail-section-title">Cancelaron ({rosterQuery.data.cancelled.length})</p>
+                      <div className="space-y-1">
+                        {rosterQuery.data.cancelled.map((p) => {
+                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                          return <div key={key} className="rounded-md border px-3 py-2 ui-text-muted">{p.fullName}{p.guestPlayerId ? ' — Invitado' : ''}</div>
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : confirmedQuery.data ? (
+                <div className="ui-detail-section">
+                  <p className="ui-detail-section-title">Confirmados ({confirmedQuery.data.length} / {selectedMatch.targetPlayers ?? '-'})</p>
+                  <div className="space-y-1">
+                    {confirmedQuery.data.map((player) => {
+                      const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                      return <div key={key} className="rounded-md border px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' — Invitado' : ''}</div>
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="ui-text-muted text-sm">Cargando...</p>
+              )}
+            </div>
+          )}
+
+          {/* Teams Tab */}
+          {detailTab === 'teams' && canManageTeams && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm">Tamano de equipo:</label>
+                <input className="ui-input w-24" type="number" min={1} value={teamSize} onChange={(event) => setTeamSize(Math.max(1, Number(event.target.value)))} />
+                <button className="ui-button-muted" onClick={() => suggestTeamsMutation.mutate()}>
+                  {suggestTeamsMutation.isPending ? 'Sugiriendo...' : 'Sugerir equipos'}
+                </button>
+                <button className="ui-button" onClick={() => saveTeamsMutation.mutate()} disabled={draftTeams.length === 0}>
+                  {saveTeamsMutation.isPending ? 'Guardando...' : 'Guardar equipos'}
+                </button>
+              </div>
+
+              {(suggestTeamsMutation.isError || saveTeamsMutation.isError) && (
+                <p className="text-sm text-[var(--danger)]">
+                  {getApiErrorMessage(suggestTeamsMutation.error ?? saveTeamsMutation.error, 'No se pudo completar la operacion de equipos.')}
+                </p>
+              )}
+
+              <div className="ui-muted-surface rounded-lg p-3">
+                <p className="text-sm font-medium">Sin asignar ({unassignedPlayers.length})</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {unassignedPlayers.map((player) => {
+                    const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                    return <span key={key} className="rounded-md border px-2 py-1 text-xs">{player.fullName}{player.guestPlayerId ? ' (Inv.)' : ''}</span>
+                  })}
+                  {unassignedPlayers.length === 0 && <span className="ui-text-muted text-xs">Todos asignados.</span>}
                 </div>
               </div>
-            )}
 
-            {isManager && selectedMatchId && (
-              <div className="ui-section-card space-y-3">
-                <div className="ui-section-header">
-                  <h3>Invitados</h3>
-                  <p>{guestsQuery.data?.length ?? 0}</p>
+              {draftTeams.map((team) => (
+                <div key={team.teamNumber} className="ui-muted-surface rounded-lg p-3">
+                  <div className="mb-2">
+                    <input className="ui-input" value={team.name} onChange={(event) =>
+                      setDraftTeams((current) => current.map((item) => item.teamNumber === team.teamNumber ? { ...item, name: event.target.value } : item))
+                    } />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    {(confirmedQuery.data ?? []).map((player) => {
+                      const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                      const isGuest = Boolean(player.guestPlayerId)
+                      const playerId = isGuest ? player.guestPlayerId : player.userId
+                      const isInTeam = isGuest ? team.guestPlayerIds.includes(playerId!) : team.playerIds.includes(playerId!)
+                      return (
+                        <label key={key} className="inline-flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={isInTeam} onChange={() => toggleDraftPlayer(team.teamNumber, playerId!, isGuest)} />
+                          <span>{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{isGuest ? ' [Inv.]' : ''}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
-                <form
-                  className="flex flex-wrap items-end gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    if (guestFullName.trim()) createGuestMutation.mutate()
-                  }}
-                >
-                  <div className="min-w-48 flex-1">
-                    <label className="ui-text-muted mb-1 block text-xs">Nombre del invitado</label>
-                    <input
-                      className="ui-input"
-                      placeholder="Nombre completo"
-                      value={guestFullName}
-                      onChange={(e) => setGuestFullName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="ui-text-muted mb-1 block text-xs">Posiciones (opcional)</label>
-                    <div className="flex flex-wrap gap-1">
-                      {PLAYER_POSITION_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          className={`rounded-md border px-2 py-1 text-xs ${
-                            guestPositionCodes.includes(opt.value)
-                              ? 'border-[var(--primary)] bg-[var(--primary)] text-white'
-                              : 'border-[var(--border)]'
-                          }`}
-                          onClick={() => toggleGuestPosition(opt.value)}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <button className="ui-button" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
-                    {createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}
-                  </button>
-                </form>
-                {createGuestMutation.isError && (
-                  <p className="text-sm text-[var(--danger)]">{getApiErrorMessage(createGuestMutation.error, 'No se pudo agregar invitado.')}</p>
-                )}
-                {guestsQuery.isLoading && <p className="ui-text-muted text-sm">Cargando invitados...</p>}
-                {guestsQuery.data && guestsQuery.data.length > 0 && (
-                  <div className="space-y-2 text-sm">
-                    {guestsQuery.data.map((guest) => (
-                      <div key={guest.id} className="ui-muted-surface flex items-center justify-between rounded-lg px-3 py-2">
-                        <div>
-                          <p className="font-medium">{guest.fullName}</p>
-                          <p className="ui-text-muted text-xs">
-                            {guest.positions.length > 0
-                              ? guest.positions.map((p) => positionLabel(p.positionCode)).join(', ')
-                              : 'Sin posicion'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {guest.status === 'PENDING' && (
-                            <>
-                              <button
-                                className="ui-button text-xs"
-                                onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })}
-                                disabled={updateGuestStatusMutation.isPending}
-                              >
-                                Confirmar
-                              </button>
-                              <button
-                                className="ui-button-muted text-xs"
-                                onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'NO' })}
-                                disabled={updateGuestStatusMutation.isPending}
-                              >
-                                Declinar
-                              </button>
-                            </>
-                          )}
-                          {guest.status === 'YES' && (
-                            <button
-                              className="ui-button-muted text-xs"
-                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'CANCELLED' })}
-                              disabled={updateGuestStatusMutation.isPending}
-                            >
-                              Cancelar
-                            </button>
-                          )}
-                          {guest.status === 'CANCELLED' && (
-                            <button
-                              className="ui-button-muted text-xs"
-                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })}
-                              disabled={updateGuestStatusMutation.isPending}
-                            >
-                              Reactivar
-                            </button>
-                          )}
-                          {guest.status === 'NO' && (
-                            <button
-                              className="ui-button-muted text-xs"
-                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'PENDING' })}
-                              disabled={updateGuestStatusMutation.isPending}
-                            >
-                              Pendiente
-                            </button>
-                          )}
-                          <span className={`ui-badge ${
-                            guest.status === 'YES' ? 'ui-badge-success' :
-                            guest.status === 'NO' ? 'ui-badge-danger' :
-                            guest.status === 'CANCELLED' ? 'ui-badge-muted' : 'ui-badge-muted'
-                          }`}>
-                            {guest.status === 'YES' ? 'Confirmado' :
-                             guest.status === 'NO' ? 'No asistira' :
-                             guest.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente'}
-                          </span>
-                          <button
-                            className="text-xs text-[var(--danger)] hover:underline"
-                            onClick={() => deleteGuestMutation.mutate(guest.id)}
-                            disabled={deleteGuestMutation.isPending}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
+              ))}
+            </div>
+          )}
+
+          {/* Guests Tab */}
+          {detailTab === 'guests' && isManager && (
+            <div className="space-y-4">
+              <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
+                e.preventDefault()
+                if (guestFullName.trim()) createGuestMutation.mutate()
+              }}>
+                <div className="min-w-48 flex-1">
+                  <label className="ui-form-label">Nombre del invitado</label>
+                  <input className="ui-input" placeholder="Nombre completo" value={guestFullName} onChange={(e) => setGuestFullName(e.target.value)} required />
+                </div>
+                <div className="flex-1">
+                  <label className="ui-form-label">Posiciones (opcional)</label>
+                  <div className="flex flex-wrap gap-1">
+                    {PLAYER_POSITION_OPTIONS.map((opt) => (
+                      <button key={opt.value} type="button" className={`rounded-md border px-2 py-1 text-xs ${guestPositionCodes.includes(opt.value) ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]' : 'border-[var(--border-soft)]'}`} onClick={() => toggleGuestPosition(opt.value)}>
+                        {opt.label}
+                      </button>
                     ))}
                   </div>
-                )}
-                {guestsQuery.data && guestsQuery.data.length === 0 && (
-                  <p className="ui-text-muted text-sm">No hay invitados agregados a este partido.</p>
-                )}
-              </div>
-            )}
-          </div>
-        </ResponsiveSection>
+                </div>
+                <button className="ui-button" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
+                  {createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}
+                </button>
+              </form>
+
+              {createGuestMutation.isError && (
+                <p className="text-sm text-[var(--danger)]">{getApiErrorMessage(createGuestMutation.error, 'No se pudo agregar invitado.')}</p>
+              )}
+
+              {guestsQuery.isLoading && <p className="ui-text-muted text-sm">Cargando invitados...</p>}
+
+              {guestsQuery.data && guestsQuery.data.length > 0 && (
+                <div className="space-y-2">
+                  {guestsQuery.data.map((guest) => (
+                    <div key={guest.id} className="ui-muted-surface flex items-center justify-between rounded-lg px-3 py-2">
+                      <div>
+                        <p className="font-medium">{guest.fullName}</p>
+                        <p className="ui-text-muted text-xs">
+                          {guest.positions.length > 0 ? guest.positions.map((p) => positionLabel(p.positionCode)).join(', ') : 'Sin posicion'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {guest.status === 'PENDING' && (
+                          <>
+                            <button className="ui-button text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending}>Confirmar</button>
+                            <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'NO' })} disabled={updateGuestStatusMutation.isPending}>Declinar</button>
+                          </>
+                        )}
+                        {guest.status === 'YES' && (
+                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'CANCELLED' })} disabled={updateGuestStatusMutation.isPending}>Cancelar</button>
+                        )}
+                        {guest.status === 'CANCELLED' && (
+                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending}>Reactivar</button>
+                        )}
+                        {guest.status === 'NO' && (
+                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'PENDING' })} disabled={updateGuestStatusMutation.isPending}>Pendiente</button>
+                        )}
+                        <span className={`ui-badge ${guest.status === 'YES' ? 'ui-badge-success' : guest.status === 'NO' ? 'ui-badge-danger' : 'ui-badge-muted'}`}>
+                          {guest.status === 'YES' ? 'Confirmado' : guest.status === 'NO' ? 'No asistira' : guest.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente'}
+                        </span>
+                        <button className="text-xs text-[var(--danger)] hover:underline" onClick={() => deleteGuestMutation.mutate(guest.id)} disabled={deleteGuestMutation.isPending}>Eliminar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {guestsQuery.data && guestsQuery.data.length === 0 && (
+                <p className="ui-text-muted text-sm">No hay invitados agregados a este partido.</p>
+              )}
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   )

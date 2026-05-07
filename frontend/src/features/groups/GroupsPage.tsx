@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { Modal } from '../../components/ui/Modal'
+import { FormField } from '../../components/ui/FormField'
 import { PlayerSelector } from '../../components/ui/PlayerSelector'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { useToastStore } from '../../store/toast-store'
-import { Icon } from '../../components/ui/Icon'
 
 type GroupItem = {
   id: string
@@ -30,44 +31,37 @@ export function GroupsPage() {
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
   const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
-  const [name, setName] = useState('')
-  const [selectedGroupId, setSelectedGroupId] = useState<string>('')
-  const [mode, setMode] = useState<'select' | 'manual'>('select')
+
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [membersModalOpen, setMembersModalOpen] = useState(false)
+  const [selectedGroup, setSelectedGroup] = useState<GroupItem | null>(null)
+  const [groupName, setGroupName] = useState('')
+  const [memberMode, setMemberMode] = useState<'select' | 'manual'>('select')
+  const [manualHandle, setManualHandle] = useState('')
 
   const groupsQuery = useQuery({
     queryKey: ['groups'],
     queryFn: async () => (await apiClient.get<GroupItem[]>('/api/v1/groups')).data,
   })
 
-  const activeGroups = useMemo(
-    () => (groupsQuery.data ?? []).filter((group) => group.active),
-    [groupsQuery.data],
-  )
-
-  const selectedGroup = useMemo(
-    () => (groupsQuery.data ?? []).find((group) => group.id === selectedGroupId),
-    [groupsQuery.data, selectedGroupId],
-  )
-
   const membersQuery = useQuery({
-    queryKey: ['group-members', selectedGroupId],
+    queryKey: ['group-members', selectedGroup?.id],
     queryFn: async () =>
-      (await apiClient.get<GroupMemberItem[]>(`/api/v1/groups/${selectedGroupId}/members`)).data,
-    enabled: Boolean(selectedGroupId),
+      (await apiClient.get<GroupMemberItem[]>(`/api/v1/groups/${selectedGroup!.id}/members`)).data,
+    enabled: Boolean(selectedGroup),
   })
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post('/api/v1/groups', { name })
+      await apiClient.post('/api/v1/groups', { name: groupName })
     },
     onSuccess: () => {
-      setName('')
-      addToast('success', `Grupo "${name}" creado`)
+      addToast('success', `Grupo "${groupName}" creado`)
       queryClient.invalidateQueries({ queryKey: ['groups'] })
+      setCreateModalOpen(false)
+      setGroupName('')
     },
-    onError: (error) => {
-      addToast('error', getApiErrorMessage(error, 'No se pudo crear el grupo'))
-    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo crear el grupo')),
   })
 
   const setActiveMutation = useMutation({
@@ -78,47 +72,41 @@ export function GroupsPage() {
       addToast('success', 'Estado del grupo actualizado')
       queryClient.invalidateQueries({ queryKey: ['groups'] })
     },
-    onError: (error) => {
-      addToast('error', getApiErrorMessage(error, 'No se pudo cambiar el estado del grupo'))
-    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo cambiar el estado del grupo')),
   })
 
   const addMemberMutation = useMutation({
     mutationFn: async (playerHandle: string) => {
-      await apiClient.post(`/api/v1/groups/${selectedGroupId}/members`, { playerHandle })
+      await apiClient.post(`/api/v1/groups/${selectedGroup!.id}/members`, { playerHandle })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group-members', selectedGroupId] })
+      queryClient.invalidateQueries({ queryKey: ['group-members', selectedGroup?.id] })
     },
-    onError: (error) => {
-      addToast('error', getApiErrorMessage(error, 'No se pudo agregar el jugador'))
-    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo agregar el jugador')),
   })
 
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await apiClient.delete(`/api/v1/groups/${selectedGroupId}/members/${userId}`)
+      await apiClient.delete(`/api/v1/groups/${selectedGroup!.id}/members/${userId}`)
     },
     onSuccess: () => {
       addToast('success', 'Jugador removido del grupo')
-      queryClient.invalidateQueries({ queryKey: ['group-members', selectedGroupId] })
+      queryClient.invalidateQueries({ queryKey: ['group-members', selectedGroup?.id] })
     },
-    onError: (error) => {
-      addToast('error', getApiErrorMessage(error, 'No se pudo remover el jugador'))
-    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo remover el jugador')),
   })
 
-  const onCreateGroup = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    createMutation.mutate()
+  const openMembers = (group: GroupItem) => {
+    setSelectedGroup(group)
+    setMembersModalOpen(true)
   }
 
   const handleToggleActive = async (group: GroupItem) => {
     const confirmed = await requestConfirm({
       title: group.active ? 'Desactivar grupo' : 'Activar grupo',
       description: group.active
-        ? `Seguro que queres desactivar el grupo "${group.name}"? Los jugadores no podran ser convocados a traves de este grupo.`
-        : `Seguro que queres reactivar el grupo "${group.name}"?`,
+        ? `Seguro que deseas desactivar "${group.name}"? Los jugadores no podran ser convocados a traves de este grupo.`
+        : `Seguro que deseas reactivar "${group.name}"?`,
       confirmLabel: group.active ? 'Desactivar' : 'Activar',
       variant: group.active ? 'danger' : 'default',
     })
@@ -130,7 +118,7 @@ export function GroupsPage() {
   const handleRemoveMember = async (member: GroupMemberItem) => {
     const confirmed = await requestConfirm({
       title: 'Remover jugador',
-      description: `Seguro que queres sacar a ${member.fullName} del grupo "${selectedGroup?.name}"?`,
+      description: `Seguro que deseas sacar a ${member.fullName} de "${selectedGroup?.name}"?`,
       confirmLabel: 'Remover',
       variant: 'danger',
     })
@@ -148,31 +136,25 @@ export function GroupsPage() {
     addMemberMutation.mutate(playerHandle)
   }
 
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!manualHandle.trim()) return
+    addMemberMutation.mutate(manualHandle.trim())
+    setManualHandle('')
+  }
+
   return (
     <div className="space-y-6">
       {ConfirmDialogComponent}
 
-      <ResponsiveSection title="Crear grupo" description="Organiza jugadores por grupos para convocatorias y avisos">
-        <form className="mt-4 flex flex-col gap-3 md:flex-row" onSubmit={onCreateGroup}>
-          <input
-            className="ui-input"
-            placeholder="Nombre del grupo"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-          <button className="ui-button shrink-0" type="submit" disabled={createMutation.isPending}>
-            <span className="inline-flex items-center gap-1.5">
-              <Icon name="groups" size="sm" />
-              {createMutation.isPending ? 'Creando...' : 'Crear grupo'}
-            </span>
-          </button>
-        </form>
-      </ResponsiveSection>
-
       <ResponsiveSection
         title="Grupos"
-        description={`Total: ${(groupsQuery.data ?? []).length} grupos | Activos: ${activeGroups.length}`}
+        description="Organiza jugadores por grupos para convocatorias y avisos"
+        action={
+          <button className="ui-button" onClick={() => setCreateModalOpen(true)}>
+            Nuevo grupo
+          </button>
+        }
       >
         {groupsQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando grupos...</p>}
         {groupsQuery.isError && <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar los grupos.</p>}
@@ -189,15 +171,12 @@ export function GroupsPage() {
                 </span>
               )},
               {
-                key: 'select',
+                key: 'actions',
                 label: '',
                 className: 'text-right',
                 render: (group) => (
                   <div className="flex justify-end gap-2">
-                    <button
-                      className="ui-button-muted"
-                      onClick={() => setSelectedGroupId(group.id)}
-                    >
+                    <button className="ui-button-muted" onClick={() => openMembers(group)}>
                       Ver miembros
                     </button>
                     <button
@@ -219,7 +198,7 @@ export function GroupsPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="ui-button-muted" onClick={() => setSelectedGroupId(group.id)}>
+                  <button className="ui-button-muted" onClick={() => openMembers(group)}>
                     Ver miembros
                   </button>
                   <button
@@ -235,164 +214,151 @@ export function GroupsPage() {
         )}
       </ResponsiveSection>
 
-      <ResponsiveSection
-        title="Miembros del grupo"
-        description={selectedGroup ? `Grupo seleccionado: ${selectedGroup.name}` : 'Selecciona un grupo'}
-        action={
-          selectedGroup ? (
-            <select
-              className="ui-input min-w-48"
-              value={selectedGroupId}
-              onChange={(event) => setSelectedGroupId(event.target.value)}
-            >
-              <option value="">Selecciona grupo</option>
-              {activeGroups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          ) : undefined
-        }
+      {/* Create Group Modal */}
+      <Modal
+        open={createModalOpen}
+        onClose={() => { setCreateModalOpen(false); setGroupName(''); }}
+        size="sm"
+        title="Nuevo grupo"
+        subtitle="Organiza jugadores para convocatorias y avisos"
       >
-        {selectedGroupId && (
-          <div className="mt-4 space-y-4">
-            <div className="ui-muted-surface rounded-lg p-3">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                  <Icon name="user-plus" size="sm" />
-                  Agregar jugadores
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${mode === 'select' ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}
-                    onClick={() => setMode('select')}
-                  >
-                    Seleccionar
-                  </button>
-                  <button
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${mode === 'manual' ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}
-                    onClick={() => setMode('manual')}
-                  >
-                    Codigo manual
-                  </button>
-                </div>
-              </div>
+        <FormField label="Nombre del grupo">
+          <input
+            className="ui-input"
+            placeholder="Ej: Titulares, Suplentes"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            required
+          />
+        </FormField>
 
-              {mode === 'select' ? (
-                <PlayerSelector
-                  existingMemberIds={existingMemberIds}
-                  onAddPlayer={handleAddPlayer}
-                  isAdding={addMemberMutation.isPending}
-                />
-              ) : (
-                <ManualMemberForm
-                  onSubmit={(handle) => addMemberMutation.mutate(handle)}
-                  isPending={addMemberMutation.isPending}
-                />
-              )}
+        {createMutation.isError && (
+          <p className="text-sm text-[var(--danger)]">
+            {getApiErrorMessage(createMutation.error, 'No se pudo crear el grupo.')}
+          </p>
+        )}
+
+        <Modal.Footer>
+          <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setGroupName(''); }}>
+            Cancelar
+          </button>
+          <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !groupName.trim()}>
+            {createMutation.isPending ? 'Creando...' : 'Crear grupo'}
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Members Modal */}
+      {selectedGroup && (
+        <Modal
+          open={membersModalOpen}
+          onClose={() => { setMembersModalOpen(false); setSelectedGroup(null); }}
+          size="lg"
+          title="Miembros del grupo"
+          subtitle={selectedGroup.name}
+        >
+          {/* Add members section */}
+          <div className="ui-detail-section">
+            <p className="ui-detail-section-title">Agregar jugadores</p>
+            <div className="mb-3 flex gap-1">
+              <button
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${memberMode === 'select' ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}
+                onClick={() => setMemberMode('select')}
+              >
+                Seleccionar
+              </button>
+              <button
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${memberMode === 'manual' ? 'bg-[var(--accent)] text-[var(--accent-contrast)]' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}
+                onClick={() => setMemberMode('manual')}
+              >
+                Codigo manual
+              </button>
             </div>
 
-            {addMemberMutation.isSuccess && (
-              <div className="rounded-lg border border-[var(--success)]/20 bg-[var(--success)]/5 px-3 py-2 text-sm text-[var(--success)]">
-                Jugador agregado al grupo correctamente.
-              </div>
+            {memberMode === 'select' ? (
+              <PlayerSelector
+                existingMemberIds={existingMemberIds}
+                onAddPlayer={handleAddPlayer}
+                isAdding={addMemberMutation.isPending}
+              />
+            ) : (
+              <form className="flex gap-2" onSubmit={handleManualSubmit}>
+                <input
+                  className="ui-input"
+                  placeholder="nick#TAG4 (ej: backset#TAKE)"
+                  value={manualHandle}
+                  onChange={(e) => setManualHandle(e.target.value)}
+                  required
+                />
+                <button className="ui-button shrink-0" type="submit" disabled={addMemberMutation.isPending}>
+                  Agregar
+                </button>
+              </form>
+            )}
+          </div>
+
+          <hr className="ui-section-divider" />
+
+          {/* Members list */}
+          <div className="ui-detail-section">
+            <p className="ui-detail-section-title">
+              Miembros ({membersQuery.data?.length ?? 0})
+            </p>
+
+            {membersQuery.isLoading && <p className="ui-text-muted text-sm">Cargando miembros...</p>}
+            {membersQuery.isError && <p className="text-sm text-[var(--danger)]">No se pudieron cargar los miembros.</p>}
+
+            {membersQuery.data && membersQuery.data.length === 0 && (
+              <p className="ui-text-muted text-sm">El grupo no tiene jugadores.</p>
             )}
 
-            {membersQuery.isLoading && (
-              <p className="ui-text-muted text-sm">Cargando miembros...</p>
-            )}
-            {membersQuery.isError && (
-              <p className="text-sm text-[var(--danger)]">No se pudieron cargar los miembros de este grupo.</p>
-            )}
-
-            {membersQuery.data && (
-              <div>
-                <p className="mb-2 text-sm font-medium">
-                  Miembros ({membersQuery.data.length})
-                </p>
-                <ResponsiveTable
-                  data={membersQuery.data}
-                  rowKey={(member) => member.userId}
-                  emptyMessage="El grupo no tiene jugadores."
-                  columns={[
-                    { key: 'name', label: 'Nombre', render: (member) => member.fullName },
-                    { key: 'email', label: 'Correo', render: (member) => member.email },
-                    { key: 'handle', label: 'Codigo', render: (member) => (
-                      <span className="ui-badge">{member.playerHandle ?? '-'}</span>
-                    )},
-                    {
-                      key: 'actions',
-                      label: '',
-                      className: 'text-right',
-                      render: (member) => (
-                        <button
-                          className="ui-button-muted ui-button-danger-text"
-                          onClick={() => handleRemoveMember(member)}
-                          disabled={removeMemberMutation.isPending}
-                        >
-                          {removeMemberMutation.isPending ? 'Quitando...' : 'Quitar'}
-                        </button>
-                      ),
-                    },
-                  ]}
-                  renderMobileCard={(member) => (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold">{member.fullName}</p>
-                        <span className="ui-badge">{member.playerHandle ?? '-'}</span>
-                      </div>
-                      <p className="ui-text-muted">{member.email}</p>
+            {membersQuery.data && membersQuery.data.length > 0 && (
+              <ResponsiveTable
+                data={membersQuery.data}
+                rowKey={(member) => member.userId}
+                emptyMessage="Sin miembros."
+                columns={[
+                  { key: 'name', label: 'Nombre', render: (member) => member.fullName },
+                  { key: 'email', label: 'Correo', render: (member) => member.email },
+                  { key: 'handle', label: 'Codigo', render: (member) => (
+                    <span className="ui-badge">{member.playerHandle ?? '-'}</span>
+                  )},
+                  {
+                    key: 'actions',
+                    label: '',
+                    className: 'text-right',
+                    render: (member) => (
                       <button
                         className="ui-button-muted"
                         onClick={() => handleRemoveMember(member)}
                         disabled={removeMemberMutation.isPending}
                       >
-                        {removeMemberMutation.isPending ? 'Quitando...' : 'Quitar del grupo'}
+                        {removeMemberMutation.isPending ? 'Quitando...' : 'Quitar'}
                       </button>
+                    ),
+                  },
+                ]}
+                renderMobileCard={(member) => (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold">{member.fullName}</p>
+                      <span className="ui-badge">{member.playerHandle ?? '-'}</span>
                     </div>
-                  )}
-                />
-              </div>
+                    <p className="ui-text-muted">{member.email}</p>
+                    <button
+                      className="ui-button-muted"
+                      onClick={() => handleRemoveMember(member)}
+                      disabled={removeMemberMutation.isPending}
+                    >
+                      Quitar del grupo
+                    </button>
+                  </div>
+                )}
+              />
             )}
           </div>
-        )}
-
-        {!selectedGroupId && (
-          <div className="mt-4 flex flex-col items-center justify-center py-8 text-center">
-            <Icon name="groups" size="lg" className="ui-text-muted mb-3" />
-            <p className="text-sm font-medium">Selecciona un grupo</p>
-            <p className="ui-text-muted mt-1 text-xs">Elige un grupo activo para ver y gestionar sus miembros</p>
-          </div>
-        )}
-      </ResponsiveSection>
+        </Modal>
+      )}
     </div>
-  )
-}
-
-function ManualMemberForm({ onSubmit, isPending }: { onSubmit: (handle: string) => void; isPending: boolean }) {
-  const [playerHandle, setPlayerHandle] = useState('')
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!playerHandle.trim()) return
-    onSubmit(playerHandle.trim())
-    setPlayerHandle('')
-  }
-  return (
-    <form className="flex flex-col gap-3 md:flex-row" onSubmit={handleSubmit}>
-      <input
-        className="ui-input"
-        placeholder="nick#TAG4 (ej: backset#TAKE)"
-        value={playerHandle}
-        onChange={(event) => setPlayerHandle(event.target.value)}
-        required
-      />
-      <button className="ui-button shrink-0" type="submit" disabled={isPending}>
-        <span className="inline-flex items-center gap-1.5">
-          <Icon name="user-plus" size="sm" />
-          {isPending ? 'Agregando...' : 'Agregar'}
-        </span>
-      </button>
-    </form>
   )
 }

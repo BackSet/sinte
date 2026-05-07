@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { Modal } from '../../components/ui/Modal'
+import { DetailModal } from '../../components/ui/DetailModal'
+import { FormField } from '../../components/ui/FormField'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { useToastStore } from '../../store/toast-store'
 
@@ -34,13 +36,8 @@ const timezoneOptions = [
   'Europe/Madrid',
 ]
 
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="ui-text-muted mb-1 block text-xs">{label}</label>
-      {children}
-    </div>
-  )
+function emptyForm() {
+  return { location: '', targetPlayers: 14, durationMinutes: 90, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota', description: '' }
 }
 
 export function ConfigsPage() {
@@ -48,12 +45,11 @@ export function ConfigsPage() {
   const addToast = useToastStore((s) => s.addToast)
   const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
 
-  const [location, setLocation] = useState('')
-  const [targetPlayers, setTargetPlayers] = useState(14)
-  const [durationMinutes, setDurationMinutes] = useState(90)
-  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
-  const [description, setDescription] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formModalOpen, setFormModalOpen] = useState(false)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [editingConfig, setEditingConfig] = useState<MatchConfigItem | null>(null)
+  const [viewingConfig, setViewingConfig] = useState<MatchConfigItem | null>(null)
+  const [form, setForm] = useState(emptyForm())
 
   const configsQuery = useQuery({
     queryKey: ['configs'],
@@ -63,39 +59,39 @@ export function ConfigsPage() {
   const createMutation = useMutation({
     mutationFn: async () => {
       await apiClient.post('/api/v1/configs', {
-        location: location.trim(),
-        targetPlayers,
-        durationMinutes,
-        timezone,
-        description: description.trim() || null,
+        location: form.location.trim(),
+        targetPlayers: form.targetPlayers,
+        durationMinutes: form.durationMinutes,
+        timezone: form.timezone,
+        description: form.description.trim() || null,
       })
     },
     onSuccess: () => {
-      setLocation('')
-      setTargetPlayers(14)
-      setDurationMinutes(90)
-      setDescription('')
       addToast('success', 'Configuracion creada')
       queryClient.invalidateQueries({ queryKey: ['configs'] })
+      setFormModalOpen(false)
+      setForm(emptyForm())
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo crear la configuracion')),
   })
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id }: { id: string }) => {
-      await apiClient.put(`/api/v1/configs/${id}`, {
-        location: location.trim(),
-        targetPlayers,
-        durationMinutes,
-        timezone,
-        description: description.trim() || null,
+    mutationFn: async () => {
+      if (!editingConfig) return
+      await apiClient.put(`/api/v1/configs/${editingConfig.id}`, {
+        location: form.location.trim(),
+        targetPlayers: form.targetPlayers,
+        durationMinutes: form.durationMinutes,
+        timezone: form.timezone,
+        description: form.description.trim() || null,
       })
     },
     onSuccess: () => {
-      setEditingId(null)
-      resetForm()
       addToast('success', 'Configuracion actualizada')
       queryClient.invalidateQueries({ queryKey: ['configs'] })
+      setFormModalOpen(false)
+      setEditingConfig(null)
+      setForm(emptyForm())
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo actualizar la configuracion')),
   })
@@ -107,32 +103,37 @@ export function ConfigsPage() {
     onSuccess: () => {
       addToast('success', 'Configuracion eliminada')
       queryClient.invalidateQueries({ queryKey: ['configs'] })
+      setDetailModalOpen(false)
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar la configuracion')),
   })
 
-  function resetForm() {
-    setLocation('')
-    setTargetPlayers(14)
-    setDurationMinutes(90)
-    setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
-    setDescription('')
-    setEditingId(null)
+  function openCreate() {
+    setEditingConfig(null)
+    setForm(emptyForm())
+    setFormModalOpen(true)
   }
 
-  function startEdit(config: MatchConfigItem) {
-    setEditingId(config.id)
-    setLocation(config.location ?? '')
-    setTargetPlayers(config.targetPlayers)
-    setDurationMinutes(config.durationMinutes)
-    setTimezone(config.timezone)
-    setDescription(config.description ?? '')
+  function openEdit(config: MatchConfigItem) {
+    setEditingConfig(config)
+    setForm({
+      location: config.location ?? '',
+      targetPlayers: config.targetPlayers,
+      durationMinutes: config.durationMinutes,
+      timezone: config.timezone,
+      description: config.description ?? '',
+    })
+    setFormModalOpen(true)
   }
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (editingId) {
-      updateMutation.mutate({ id: editingId })
+  function openDetail(config: MatchConfigItem) {
+    setViewingConfig(config)
+    setDetailModalOpen(true)
+  }
+
+  const handleSubmit = () => {
+    if (editingConfig) {
+      updateMutation.mutate()
     } else {
       createMutation.mutate()
     }
@@ -141,7 +142,7 @@ export function ConfigsPage() {
   const handleDelete = async (config: MatchConfigItem) => {
     const confirmed = await requestConfirm({
       title: 'Eliminar configuracion',
-      description: `Seguro que deseas eliminar la configuracion "${config.location}"? Los partidos que referencien esta configuracion no se veran afectados.`,
+      description: `Seguro que deseas eliminar "${config.location}"? Los partidos que referencien esta configuracion no se veran afectados.`,
       confirmLabel: 'Eliminar',
       variant: 'danger',
     })
@@ -150,86 +151,22 @@ export function ConfigsPage() {
     }
   }
 
+  const isPending = createMutation.isPending || updateMutation.isPending
+  const mutationError = createMutation.error ?? updateMutation.error
+
   return (
     <div className="space-y-6">
       {ConfirmDialogComponent}
 
       <ResponsiveSection
-        title={editingId ? 'Editar configuracion' : 'Crear configuracion'}
+        title="Configuraciones"
         description="Configuraciones reutilizables para partidos y series"
+        action={
+          <button className="ui-button" onClick={openCreate}>
+            Nueva configuracion
+          </button>
+        }
       >
-        <form className="mt-4 space-y-5" onSubmit={onSubmit}>
-          <div className="ui-section-card space-y-3">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FormField label="Ubicacion">
-                <input
-                  className="ui-input"
-                  placeholder="Cancha principal"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  required
-                />
-              </FormField>
-              <FormField label="Plantilla objetivo">
-                <input
-                  className="ui-input"
-                  type="number"
-                  min={1}
-                  value={targetPlayers}
-                  onChange={(e) => setTargetPlayers(Math.max(1, Math.trunc(Number(e.target.value) || 1)))}
-                  required
-                />
-              </FormField>
-              <FormField label="Duracion (minutos)">
-                <input
-                  className="ui-input"
-                  type="number"
-                  min={1}
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Math.max(1, Math.trunc(Number(e.target.value) || 1)))}
-                  required
-                />
-              </FormField>
-              <FormField label="Zona horaria">
-                <select className="ui-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} required>
-                  {timezoneOptions.map((zone) => (
-                    <option key={zone} value={zone}>{zone}</option>
-                  ))}
-                </select>
-              </FormField>
-              <div className="md:col-span-2">
-                <FormField label="Descripcion (opcional)">
-                  <textarea
-                    className="ui-input"
-                    placeholder="Notas sobre la cancha, horario, etc."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </FormField>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button className="ui-button" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {editingId
-                ? updateMutation.isPending ? 'Guardando...' : 'Guardar cambios'
-                : createMutation.isPending ? 'Creando...' : 'Crear configuracion'}
-            </button>
-            {editingId && (
-              <button type="button" className="ui-button-muted" onClick={resetForm}>
-                Cancelar
-              </button>
-            )}
-          </div>
-          {(createMutation.isError || updateMutation.isError) && (
-            <p className="text-sm text-[var(--danger)]">
-              {getApiErrorMessage(createMutation.error ?? updateMutation.error, 'No se pudo guardar la configuracion.')}
-            </p>
-          )}
-        </form>
-      </ResponsiveSection>
-
-      <ResponsiveSection title="Configuraciones" description="Configuraciones reutilizables para partidos y series">
         {configsQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando configuraciones...</p>}
         {configsQuery.isError && <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar las configuraciones.</p>}
         {configsQuery.data && (
@@ -248,7 +185,8 @@ export function ConfigsPage() {
                 className: 'text-right',
                 render: (c) => (
                   <div className="flex justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => startEdit(c)}>Editar</button>
+                    <button className="ui-button-muted" onClick={() => openDetail(c)}>Ver</button>
+                    <button className="ui-button-muted" onClick={() => openEdit(c)}>Editar</button>
                     <button className="ui-button-muted" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending}>
                       Eliminar
                     </button>
@@ -263,7 +201,8 @@ export function ConfigsPage() {
                 <p className="ui-text-muted">Duracion: {c.durationMinutes} min | {c.timezone}</p>
                 {c.description && <p className="ui-text-muted">{c.description}</p>}
                 <div className="flex gap-2">
-                  <button className="ui-button-muted" onClick={() => startEdit(c)}>Editar</button>
+                  <button className="ui-button-muted" onClick={() => openDetail(c)}>Ver</button>
+                  <button className="ui-button-muted" onClick={() => openEdit(c)}>Editar</button>
                   <button className="ui-button-muted" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending}>
                     Eliminar
                   </button>
@@ -273,6 +212,122 @@ export function ConfigsPage() {
           />
         )}
       </ResponsiveSection>
+
+      {/* Create / Edit Modal */}
+      <Modal
+        open={formModalOpen}
+        onClose={() => { setFormModalOpen(false); setEditingConfig(null); setForm(emptyForm()); }}
+        size="md"
+        title={editingConfig ? 'Editar configuracion' : 'Nueva configuracion'}
+        subtitle={editingConfig ? `Editando: ${editingConfig.location}` : 'Configuracion para partidos y series'}
+      >
+        <FormField label="Ubicacion">
+          <input
+            className="ui-input"
+            placeholder="Cancha principal"
+            value={form.location}
+            onChange={(e) => setForm({ ...form, location: e.target.value })}
+            required
+          />
+        </FormField>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Plantilla objetivo">
+            <input
+              className="ui-input"
+              type="number"
+              min={1}
+              value={form.targetPlayers}
+              onChange={(e) => setForm({ ...form, targetPlayers: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })}
+              required
+            />
+          </FormField>
+          <FormField label="Duracion (minutos)">
+            <input
+              className="ui-input"
+              type="number"
+              min={1}
+              value={form.durationMinutes}
+              onChange={(e) => setForm({ ...form, durationMinutes: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })}
+              required
+            />
+          </FormField>
+        </div>
+
+        <FormField label="Zona horaria">
+          <select className="ui-input" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} required>
+            {timezoneOptions.map((zone) => (
+              <option key={zone} value={zone}>{zone}</option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Descripcion (opcional)">
+          <textarea
+            className="ui-input"
+            placeholder="Notas sobre la cancha, horario, etc."
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            rows={3}
+          />
+        </FormField>
+
+        {mutationError && (
+          <p className="text-sm text-[var(--danger)]">
+            {getApiErrorMessage(mutationError, 'No se pudo guardar la configuracion.')}
+          </p>
+        )}
+
+        <Modal.Footer>
+          <button className="ui-button-muted" onClick={() => { setFormModalOpen(false); setEditingConfig(null); setForm(emptyForm()); }}>
+            Cancelar
+          </button>
+          <button className="ui-button" onClick={handleSubmit} disabled={isPending || !form.location.trim()}>
+            {isPending ? 'Guardando...' : editingConfig ? 'Guardar cambios' : 'Crear configuracion'}
+          </button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Detail Modal */}
+      {viewingConfig && (
+        <DetailModal
+          open={detailModalOpen}
+          onClose={() => { setDetailModalOpen(false); setViewingConfig(null); }}
+          size="sm"
+          title="Detalle de configuracion"
+          subtitle={viewingConfig.location}
+        >
+          <DetailModal.Section title="Informacion general">
+            <DetailModal.InfoRow label="Ubicacion" value={viewingConfig.location} />
+            <DetailModal.InfoRow label="Plantilla objetivo" value={`${viewingConfig.targetPlayers} jugadores`} />
+            <DetailModal.InfoRow label="Duracion" value={`${viewingConfig.durationMinutes} minutos`} />
+            <DetailModal.InfoRow label="Zona horaria" value={viewingConfig.timezone} />
+          </DetailModal.Section>
+
+          {viewingConfig.description && (
+            <>
+              <DetailModal.Divider />
+              <DetailModal.Section title="Descripcion">
+                <p className="text-sm ui-text-muted">{viewingConfig.description}</p>
+              </DetailModal.Section>
+            </>
+          )}
+
+          <DetailModal.Divider />
+          <DetailModal.Section title="Creada el">
+            <p className="text-sm ui-text-muted">{new Date(viewingConfig.createdAt).toLocaleString()}</p>
+          </DetailModal.Section>
+
+          <Modal.Footer>
+            <button className="ui-button-muted" onClick={() => { setDetailModalOpen(false); setViewingConfig(null); }}>
+              Cerrar
+            </button>
+            <button className="ui-button" onClick={() => { setDetailModalOpen(false); openEdit(viewingConfig); }}>
+              Editar
+            </button>
+          </Modal.Footer>
+        </DetailModal>
+      )}
     </div>
   )
 }
