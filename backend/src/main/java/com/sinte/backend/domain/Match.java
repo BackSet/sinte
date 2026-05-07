@@ -28,7 +28,7 @@ public class Match {
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
 
-    @Column(nullable = false, length = 120)
+    @Column(length = 120)
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -55,11 +55,12 @@ public class Match {
     @JoinColumn(name = "series_id")
     private MatchSeries series;
 
+    @ManyToOne
+    @JoinColumn(name = "config_id")
+    private MatchConfig config;
+
     @Column(name = "target_players")
     private Integer targetPlayers;
-
-    @Column(name = "attendance_open", nullable = false)
-    private boolean attendanceOpen = true;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -75,7 +76,8 @@ public class Match {
             OffsetDateTime startsAt,
             OffsetDateTime endsAt,
             MatchSourceType sourceType,
-            MatchSeries series
+            MatchSeries series,
+            MatchConfig config
     ) {
         this.createdBy = createdBy;
         this.title = title;
@@ -85,6 +87,7 @@ public class Match {
         this.endsAt = endsAt;
         this.sourceType = sourceType;
         this.series = series;
+        this.config = config;
     }
 
     @PrePersist
@@ -132,16 +135,20 @@ public class Match {
         return series;
     }
 
+    public MatchConfig getConfig() {
+        return config;
+    }
+
     public Integer getTargetPlayers() {
         return targetPlayers;
     }
 
-    public boolean isAttendanceOpen() {
-        return attendanceOpen;
-    }
-
     public OffsetDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public boolean isAttendanceOpen() {
+        return this.status == MatchStatus.SCHEDULED && !this.startsAt.isBefore(OffsetDateTime.now());
     }
 
     public void update(String title, String description, String location, OffsetDateTime startsAt, OffsetDateTime endsAt) {
@@ -156,12 +163,14 @@ public class Match {
         this.status = status;
     }
 
-    public void configureAttendance(Integer targetPlayers, boolean attendanceOpen) {
-        this.targetPlayers = targetPlayers;
-        this.attendanceOpen = attendanceOpen;
+    public void snapshotFromConfig() {
+        if (this.config != null) {
+            this.location = this.config.getLocation();
+            this.targetPlayers = this.config.getTargetPlayers();
+        }
     }
 
-    public void updateAttendanceOpen(boolean attendanceOpen) {
-        this.attendanceOpen = attendanceOpen;
+    public void setConfig(MatchConfig config) {
+        this.config = config;
     }
 }

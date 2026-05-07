@@ -33,25 +33,23 @@ public class RefreshToken {
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
 
-    @Column(name = "metadata", columnDefinition = "TEXT")
-    private String metadata;
-
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     protected RefreshToken() {
     }
 
-    public RefreshToken(User user, String tokenHash, OffsetDateTime expiresAt, String metadata) {
+    public RefreshToken(User user, String tokenHash, OffsetDateTime expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
-        this.metadata = metadata;
     }
 
     @PrePersist
     void onCreate() {
-        this.createdAt = OffsetDateTime.now();
+        if (createdAt == null) {
+            createdAt = OffsetDateTime.now();
+        }
     }
 
     public UUID getId() {
@@ -72,6 +70,10 @@ public class RefreshToken {
 
     public OffsetDateTime getRevokedAt() {
         return revokedAt;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
     }
 
     public boolean isRevoked() {

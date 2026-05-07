@@ -32,20 +32,15 @@ public class SinteGroupMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "added_by_user_id", nullable = false)
-    private User addedBy;
-
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     protected SinteGroupMember() {
     }
 
-    public SinteGroupMember(SinteGroup group, User user, User addedBy) {
+    public SinteGroupMember(SinteGroup group, User user) {
         this.group = group;
         this.user = user;
-        this.addedBy = addedBy;
     }
 
     @PrePersist
@@ -63,10 +58,6 @@ public class SinteGroupMember {
 
     public User getUser() {
         return user;
-    }
-
-    public User getAddedBy() {
-        return addedBy;
     }
 
     public OffsetDateTime getCreatedAt() {

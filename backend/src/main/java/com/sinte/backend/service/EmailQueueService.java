@@ -1,7 +1,6 @@
 package com.sinte.backend.service;
 
 import com.sinte.backend.domain.EmailQueue;
-import com.sinte.backend.domain.Notification;
 import com.sinte.backend.domain.enums.EmailStatus;
 import com.sinte.backend.repository.EmailQueueRepository;
 import java.time.OffsetDateTime;
@@ -22,8 +21,8 @@ public class EmailQueueService {
     }
 
     @Transactional
-    public EmailQueue enqueue(Notification notification, String toEmail, String subject, String htmlBody) {
-        EmailQueue email = new EmailQueue(notification, toEmail, subject, htmlBody);
+    public EmailQueue enqueue(String toEmail, String subject, String htmlBody) {
+        EmailQueue email = new EmailQueue(toEmail, subject, htmlBody);
         return emailQueueRepository.save(email);
     }
 

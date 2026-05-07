@@ -1,0 +1,13 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-26",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-26",
+            "path": "C:\\Program Files\\Java\\jdk-26",
+            "default": true
+        }
+    ],
+    "java.import.gradle.java.home": "C:\\Program Files\\Java\\jdk-26",
+    "java.configuration.updateBuildConfiguration": "interactive"
+}

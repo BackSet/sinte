@@ -14,6 +14,13 @@ type IconName =
   | 'logout'
   | 'calendar'
   | 'clock'
+  | 'search'
+  | 'user-plus'
+  | 'check'
+  | 'x'
+  | 'alert'
+  | 'eye'
+  | 'eye-off'
 
 type IconSize = 'sm' | 'md' | 'lg'
 
@@ -68,6 +75,27 @@ function IconPath({ name, ...props }: { name: IconName } & SVGProps<SVGPathEleme
   }
   if (name === 'clock') {
     return <path {...props} d="M12 7v5l3 2M20 12a8 8 0 1 1-16 0a8 8 0 0 1 16 0z" />
+  }
+  if (name === 'search') {
+    return <path {...props} d="M10 17a7 7 0 1 0 0-14a7 7 0 0 0 0 14zm4.5 3.5L18 21l-3.5-4.5z" />
+  }
+  if (name === 'user-plus') {
+    return <path {...props} d="M15 8a3 3 0 1 0-6 0a3 3 0 0 0 6 0zm-8 9a4 4 0 0 1 8 0M19 8v6m3-3h-6" />
+  }
+  if (name === 'check') {
+    return <path {...props} d="M4 12l5 5L20 7" />
+  }
+  if (name === 'x') {
+    return <path {...props} d="M6 6l12 12M18 6L6 18" />
+  }
+  if (name === 'alert') {
+    return <path {...props} d="M12 3L2 20h20L12 3zm0 5v5m0 2h.01" />
+  }
+  if (name === 'eye') {
+    return <path {...props} d="M1 12s4-8 11-8s11 8 11 8s-4 8-11 8s-11-8-11-8zm11-5a5 5 0 1 0 0 10a5 5 0 0 0 0-10z" />
+  }
+  if (name === 'eye-off') {
+    return <path {...props} d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
   }
   return <path {...props} d="M5 12h14M12 5v14M4 4h16v16H4z" />
 }

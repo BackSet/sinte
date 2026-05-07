@@ -1,10 +1,7 @@
 package com.sinte.backend.domain;
 
-import com.sinte.backend.domain.enums.PlayerPosition;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -37,14 +34,6 @@ public class User {
     @Column(name = "nickname_tag", length = 4)
     private String nicknameTag;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "primary_position", nullable = false, length = 40)
-    private PlayerPosition primaryPosition;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "secondary_position", length = 40)
-    private PlayerPosition secondaryPosition;
-
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
@@ -66,8 +55,6 @@ public class User {
             String phone,
             String nickname,
             String nicknameTag,
-            PlayerPosition primaryPosition,
-            PlayerPosition secondaryPosition,
             String passwordHash
     ) {
         this.fullName = fullName;
@@ -75,8 +62,6 @@ public class User {
         this.phone = phone;
         this.nickname = nickname;
         this.nicknameTag = nicknameTag;
-        this.primaryPosition = primaryPosition;
-        this.secondaryPosition = secondaryPosition;
         this.passwordHash = passwordHash;
     }
 
@@ -141,22 +126,6 @@ public class User {
             return null;
         }
         return nickname + "#" + nicknameTag;
-    }
-
-    public PlayerPosition getPrimaryPosition() {
-        return primaryPosition;
-    }
-
-    public void setPrimaryPosition(PlayerPosition primaryPosition) {
-        this.primaryPosition = primaryPosition;
-    }
-
-    public PlayerPosition getSecondaryPosition() {
-        return secondaryPosition;
-    }
-
-    public void setSecondaryPosition(PlayerPosition secondaryPosition) {
-        this.secondaryPosition = secondaryPosition;
     }
 
     public String getPasswordHash() {

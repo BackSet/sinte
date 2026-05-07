@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { logout } from '../features/auth/auth-api'
 import { useAuthStore } from '../store/auth-store'
+import { useToastStore } from '../store/toast-store'
 import { MobileTabBar } from '../components/navigation/MobileTabBar'
 import { ThemeToggle } from '../components/ui/ThemeToggle'
 import { Icon } from '../components/ui/Icon'
@@ -10,6 +11,7 @@ export function DashboardLayout() {
   const navigate = useNavigate()
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const refreshToken = useAuthStore((s) => s.refreshToken)
+  const addToast = useToastStore((s) => s.addToast)
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.roles.includes('ADMIN')
   const canManage = user?.roles.some((role) => role === 'DT' || role === 'ADMIN')
@@ -35,6 +37,7 @@ export function DashboardLayout() {
       }
     },
     onSettled: () => {
+      addToast('info', 'Sesion cerrada')
       clearAuth()
       navigate('/login', { replace: true })
     },
@@ -44,7 +47,8 @@ export function DashboardLayout() {
     <div className="min-h-screen">
       <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 md:grid-cols-[250px_1fr]">
         <aside className="hidden border-r p-4 md:block" aria-label="Navegacion principal">
-          <Link className="mb-6 block text-lg font-semibold tracking-tight" to="/dashboard">
+          <Link className="mb-6 flex items-center gap-2 text-lg font-bold tracking-tight" to="/dashboard">
+            <Icon name="dashboard" size="lg" />
             SINTE
           </Link>
           <nav className="space-y-4" aria-label="Secciones">
@@ -119,7 +123,7 @@ export function DashboardLayout() {
               <button className="ui-button-muted" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
                 <span className="inline-flex items-center gap-2">
                   <Icon name="logout" size="sm" />
-                  {logoutMutation.isPending ? 'Saliendo...' : 'Cerrar sesion'}
+                  <span className="hidden sm:inline">{logoutMutation.isPending ? 'Saliendo...' : 'Cerrar sesion'}</span>
                 </span>
               </button>
             </div>

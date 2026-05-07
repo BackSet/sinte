@@ -33,7 +33,7 @@ public class NotificationService {
                 .orElseThrow(() -> new DomainException("Usuario no encontrado"));
 
         Notification notification = notificationRepository.save(new Notification(user, type, title, body));
-        emailQueueService.enqueue(notification, user.getEmail(), title, body);
+        emailQueueService.enqueue(user.getEmail(), title, body);
         return notification;
     }
 

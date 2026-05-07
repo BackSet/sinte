@@ -1,6 +1,9 @@
+import type { AuthUser } from '../store/auth-store'
+
 export type SessionData = {
   accessToken: string
   refreshToken: string
+  user: AuthUser
 }
 
 const SESSION_KEY = 'sinte_session'

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api-client'
+import { useToastStore } from '../../store/toast-store'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 
@@ -9,7 +10,7 @@ type AttendanceItem = {
   matchTitle: string
   matchStartsAt: string
   matchStatus: string
-  status: 'PENDING' | 'YES' | 'NO'
+  status: 'PENDING' | 'YES' | 'NO' | 'CANCELLED'
   respondedAt?: string
   comment?: string
   attendanceOpen: boolean
@@ -18,8 +19,16 @@ type AttendanceItem = {
   pendingCount: number
 }
 
+function StatusBadge({ status }: { status: AttendanceItem['status'] }) {
+  if (status === 'YES') return <span className="ui-badge ui-badge-success">Confirmada</span>
+  if (status === 'NO') return <span className="ui-badge ui-badge-danger">No asistire</span>
+  if (status === 'CANCELLED') return <span className="ui-badge ui-badge-danger">Cancelada</span>
+  return <span className="ui-badge ui-badge-muted">Pendiente</span>
+}
+
 export function AttendancePage() {
   const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
 
   const attendanceQuery = useQuery({
     queryKey: ['attendance-me'],
@@ -27,24 +36,15 @@ export function AttendancePage() {
   })
 
   const respondMutation = useMutation({
-    mutationFn: async ({ matchId, status }: { matchId: string; status: 'YES' | 'NO' }) => {
+    mutationFn: async ({ matchId, status }: { matchId: string; status: 'YES' | 'NO' | 'CANCELLED' }) => {
       await apiClient.post('/api/v1/attendance/respond', { matchId, status })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attendance-me'] }),
-  })
-
-  const unconfirmMutation = useMutation({
-    mutationFn: async ({ matchId }: { matchId: string }) => {
-      await apiClient.post('/api/v1/attendance/unconfirm', { matchId })
+    onSuccess: () => {
+      addToast('success', 'Respuesta registrada')
+      queryClient.invalidateQueries({ queryKey: ['attendance-me'] })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attendance-me'] }),
+    onError: () => addToast('error', 'No se pudo registrar tu respuesta'),
   })
-
-  const formatAttendanceStatus = (status: AttendanceItem['status']) => {
-    if (status === 'YES') return 'Confirmada'
-    if (status === 'NO') return 'No asistire'
-    return 'Pendiente'
-  }
 
   return (
     <ResponsiveSection
@@ -53,7 +53,7 @@ export function AttendancePage() {
     >
       {attendanceQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando asistencias...</p>}
       {attendanceQuery.isError && (
-        <p className="mt-3 text-sm text-red-600">No se pudo cargar tu asistencia. Intenta nuevamente.</p>
+        <p className="mt-3 text-sm text-[var(--danger)]">No se pudo cargar tu asistencia. Intenta nuevamente.</p>
       )}
       {attendanceQuery.data && (
         <ResponsiveTable
@@ -71,25 +71,29 @@ export function AttendancePage() {
                 </div>
               ),
             },
-            { key: 'status', label: 'Tu respuesta', render: (attendance) => formatAttendanceStatus(attendance.status) },
+            { key: 'status', label: 'Tu respuesta', render: (attendance) => <StatusBadge status={attendance.status} /> },
             {
               key: 'quota',
               label: 'Convocatoria',
               render: (attendance) =>
                 attendance.targetPlayers
-                  ? `${attendance.confirmedYesCount} confirmados / ${attendance.pendingCount} pendientes (${attendance.attendanceOpen ? 'Abierta' : 'Cerrada'})`
+                  ? `${attendance.confirmedYesCount}/${attendance.targetPlayers} (${attendance.attendanceOpen ? 'Abierta' : 'Cerrada'})`
                   : '-',
             },
             {
               key: 'matchState',
-              label: 'Estado del partido',
-              render: (attendance) => attendance.matchStatus,
+              label: 'Estado',
+              render: (attendance) => (
+                <span className={`ui-badge ${attendance.matchStatus === 'SCHEDULED' ? 'ui-badge-success' : 'ui-badge-muted'}`}>
+                  {attendance.matchStatus}
+                </span>
+              ),
             },
             {
               key: 'responseDate',
               label: 'Respuesta',
               render: (attendance) =>
-                attendance.respondedAt ? new Date(attendance.respondedAt).toLocaleString() : 'Pendiente',
+                attendance.respondedAt ? new Date(attendance.respondedAt).toLocaleString() : '-',
             },
             {
               key: 'actions',
@@ -97,27 +101,31 @@ export function AttendancePage() {
               className: 'text-right',
               render: (attendance) => (
                 <div className="flex justify-end gap-2">
-                  <button
-                    className="ui-button-muted"
-                    disabled={!attendance.attendanceOpen || respondMutation.isPending}
-                    onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
-                  >
-                    Confirmar
-                  </button>
-                  <button
-                    className="ui-button-muted"
-                    disabled={!attendance.attendanceOpen || respondMutation.isPending}
-                    onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
-                  >
-                    No podre asistir
-                  </button>
-                  {attendance.status !== 'PENDING' && (
+                  {attendance.status !== 'YES' && (
+                    <button
+                      className="ui-button"
+                      disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                      onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
+                    >
+                      Confirmar
+                    </button>
+                  )}
+                  {attendance.status !== 'NO' && attendance.status !== 'CANCELLED' && (
                     <button
                       className="ui-button-muted"
-                      disabled={unconfirmMutation.isPending}
-                      onClick={() => unconfirmMutation.mutate({ matchId: attendance.matchId })}
+                      disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                      onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
                     >
-                      Limpiar respuesta
+                      No podre
+                    </button>
+                  )}
+                  {attendance.status === 'YES' && (
+                    <button
+                      className="ui-button-muted"
+                      disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                      onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'CANCELLED' })}
+                    >
+                      Cancelar asistencia
                     </button>
                   )}
                 </div>
@@ -126,41 +134,43 @@ export function AttendancePage() {
           ]}
           renderMobileCard={(attendance) => (
             <div className="space-y-2 text-sm">
-              <p className="font-semibold">{attendance.matchTitle}</p>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold">{attendance.matchTitle}</p>
+                <StatusBadge status={attendance.status} />
+              </div>
               <p className="ui-text-muted">Inicio: {new Date(attendance.matchStartsAt).toLocaleString()}</p>
-              <p className="ui-text-muted">Tu respuesta: {formatAttendanceStatus(attendance.status)}</p>
               <p className="ui-text-muted">
                 Plantilla:{' '}
                 {attendance.targetPlayers
-                  ? `${attendance.confirmedYesCount} confirmados / ${attendance.pendingCount} pendientes (${attendance.attendanceOpen ? 'Abierta' : 'Cerrada'})`
+                  ? `${attendance.confirmedYesCount}/${attendance.targetPlayers} (${attendance.attendanceOpen ? 'Abierta' : 'Cerrada'})`
                   : 'Sin objetivo'}
               </p>
-              <p className="ui-text-muted">Estado del partido: {attendance.matchStatus}</p>
-              <p className="ui-text-muted">
-                Respondido: {attendance.respondedAt ? new Date(attendance.respondedAt).toLocaleString() : 'Pendiente'}
-              </p>
-              <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
-                <button
-                  className="ui-button-muted"
-                  disabled={!attendance.attendanceOpen || respondMutation.isPending}
-                  onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
-                >
-                  Confirmar
-                </button>
-                <button
-                  className="ui-button-muted"
-                  disabled={!attendance.attendanceOpen || respondMutation.isPending}
-                  onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
-                >
-                  No podre asistir
-                </button>
-                {attendance.status !== 'PENDING' && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {attendance.status !== 'YES' && (
+                  <button
+                    className="ui-button"
+                    disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                    onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
+                  >
+                    Confirmar
+                  </button>
+                )}
+                {attendance.status !== 'NO' && attendance.status !== 'CANCELLED' && (
                   <button
                     className="ui-button-muted"
-                    disabled={unconfirmMutation.isPending}
-                    onClick={() => unconfirmMutation.mutate({ matchId: attendance.matchId })}
+                    disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                    onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
                   >
-                    Limpiar respuesta
+                    No podre
+                  </button>
+                )}
+                {attendance.status === 'YES' && (
+                  <button
+                    className="ui-button-muted col-span-2"
+                    disabled={!attendance.attendanceOpen || respondMutation.isPending}
+                    onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'CANCELLED' })}
+                  >
+                    Cancelar asistencia
                   </button>
                 )}
               </div>

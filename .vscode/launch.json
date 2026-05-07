@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "BackendApplication (JDK 26)",
+            "request": "launch",
+            "mainClass": "com.sinte.backend.BackendApplication",
+            "projectName": "backend",
+            "javaExec": "C:\\Program Files\\Java\\jdk-26\\bin\\java.exe",
+            "cwd": "${workspaceFolder}/backend",
+            "envFile": "${workspaceFolder}/backend/.env"
+        }
+    ]
+}

@@ -1,6 +1,5 @@
 import { apiClient } from '../../lib/api-client'
 import type { AuthUser } from '../../store/auth-store'
-import type { PlayerPosition } from '../../lib/player-positions'
 
 export type AuthResponse = {
   userId: string
@@ -9,8 +8,6 @@ export type AuthResponse = {
   nickname?: string
   nicknameTag?: string
   playerHandle?: string
-  primaryPosition?: PlayerPosition
-  secondaryPosition?: PlayerPosition
   roles: string[]
   accessToken: string
   refreshToken: string
@@ -21,8 +18,6 @@ export type RegisterPayload = {
   email: string
   phone: string
   nickname?: string
-  primaryPosition: PlayerPosition
-  secondaryPosition?: PlayerPosition
   password: string
 }
 
@@ -50,8 +45,6 @@ export async function getMe(): Promise<AuthUser> {
     nickname?: string
     nicknameTag?: string
     playerHandle?: string
-    primaryPosition?: PlayerPosition
-    secondaryPosition?: PlayerPosition
     roles: string[]
   }>('/api/v1/auth/me')
   return response.data

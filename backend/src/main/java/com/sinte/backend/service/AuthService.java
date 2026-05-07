@@ -6,11 +6,11 @@ import com.sinte.backend.api.v1.auth.dto.RegisterRequest;
 import com.sinte.backend.api.v1.auth.dto.UserMeResponse;
 import com.sinte.backend.config.security.JwtProperties;
 import com.sinte.backend.config.security.JwtService;
+
 import com.sinte.backend.domain.RefreshToken;
 import com.sinte.backend.domain.Role;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.UserRole;
-import com.sinte.backend.domain.enums.PlayerPosition;
 import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.repository.RefreshTokenRepository;
 import com.sinte.backend.repository.RoleRepository;
@@ -72,11 +72,8 @@ public class AuthService {
                 request.phone(),
                 request.nickname(),
                 null,
-                request.primaryPosition(),
-                request.secondaryPosition(),
                 passwordEncoder.encode(request.password())
         );
-        validatePositions(user.getPrimaryPosition(), user.getSecondaryPosition());
         userHandleService.ensureHandle(user, null);
         User savedUser = userRepository.save(user);
 
@@ -148,8 +145,6 @@ public class AuthService {
                 user.getNickname(),
                 user.getNicknameTag(),
                 userHandleService.buildHandle(user.getNickname(), user.getNicknameTag()),
-                user.getPrimaryPosition(),
-                user.getSecondaryPosition(),
                 roles
         );
     }
@@ -161,7 +156,7 @@ public class AuthService {
         String refreshTokenRaw = generateRawRefreshToken();
         String refreshTokenHash = hashToken(refreshTokenRaw);
         OffsetDateTime expiresAt = OffsetDateTime.now().plusDays(jwtProperties.getRefreshTokenDays());
-        refreshTokenRepository.save(new RefreshToken(user, refreshTokenHash, expiresAt, "{\"source\":\"api\"}"));
+        refreshTokenRepository.save(new RefreshToken(user, refreshTokenHash, expiresAt));
 
         return new AuthResponse(
                 user.getId(),
@@ -170,8 +165,6 @@ public class AuthService {
                 user.getNickname(),
                 user.getNicknameTag(),
                 userHandleService.buildHandle(user.getNickname(), user.getNicknameTag()),
-                user.getPrimaryPosition(),
-                user.getSecondaryPosition(),
                 roles,
                 accessToken,
                 refreshTokenRaw
@@ -204,15 +197,6 @@ public class AuthService {
         Role role = roleRepository.findByCode(roleCode)
                 .orElseGet(() -> roleRepository.save(new Role(roleCode, roleDisplayName(roleCode))));
         userRoleRepository.save(new UserRole(user, role));
-    }
-
-    private void validatePositions(PlayerPosition primaryPosition, PlayerPosition secondaryPosition) {
-        if (primaryPosition == null) {
-            throw new DomainException("La posicion principal es obligatoria");
-        }
-        if (secondaryPosition != null && secondaryPosition == primaryPosition) {
-            throw new DomainException("La posicion secundaria debe ser distinta de la principal");
-        }
     }
 
     private String roleDisplayName(RoleCode roleCode) {

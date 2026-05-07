@@ -5,34 +5,39 @@ import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { DateTimeField } from '../../components/ui/DateTimeField'
+import { GroupSelector } from '../../components/ui/GroupSelector'
 
 type RecurrenceType = 'WEEKLY' | 'EVERY_N_DAYS' | 'MONTHLY_DAY_OF_MONTH'
+
+type SeriesRule = {
+  recurrenceType: RecurrenceType
+  dayOfWeek?: number
+  intervalDays?: number
+  dayOfMonth?: number
+  startTime: string
+}
 
 type SeriesItem = {
   id: string
   createdByName?: string
-  name: string
+  configId: string
+  defaultTitle: string
   timezone: string
-  location?: string
-  targetPlayers?: number
   targetGroupIds?: string[]
   targetGroups?: Array<{ id: string; name: string }>
   active: boolean
   startDate: string
   endDate?: string
-  rules: Array<{
-    recurrenceType: RecurrenceType
-    dayOfWeek?: number
-    intervalDays?: number
-    dayOfMonth?: number
-    startTime: string
-  }>
+  rules: SeriesRule[]
 }
 
-type GroupItem = {
+type MatchConfigItem = {
   id: string
-  name: string
-  active: boolean
+  location?: string
+  targetPlayers: number
+  durationMinutes: number
+  timezone: string
+  description?: string
 }
 
 const weekdays = [
@@ -71,6 +76,9 @@ type RuleFormItem = {
   startTime: string
 }
 
+const DEFAULT_TARGET_PLAYERS = 14
+const DEFAULT_DURATION_MINUTES = 90
+
 function createWeeklyRule(): RuleFormItem {
   return {
     id: crypto.randomUUID(),
@@ -80,15 +88,28 @@ function createWeeklyRule(): RuleFormItem {
   }
 }
 
-function describeRule(rule: SeriesItem['rules'][number]) {
+function ruleFromSeries(rule: SeriesRule): RuleFormItem {
+  return {
+    id: crypto.randomUUID(),
+    recurrenceType: rule.recurrenceType,
+    dayOfWeek: rule.dayOfWeek,
+    intervalDays: rule.intervalDays,
+    dayOfMonth: rule.dayOfMonth,
+    startTime: rule.startTime,
+  }
+}
+
+function describeRule(rule: SeriesRule) {
+  let desc = ''
   if (rule.recurrenceType === 'WEEKLY') {
     const label = weekdays.find((day) => day.value === rule.dayOfWeek)?.label ?? `Dia ${rule.dayOfWeek}`
-    return `Semanal: ${label} ${rule.startTime}`
+    desc = `Semanal: ${label} ${rule.startTime}`
+  } else if (rule.recurrenceType === 'EVERY_N_DAYS') {
+    desc = `Cada ${rule.intervalDays ?? '?'} dias a las ${rule.startTime}`
+  } else {
+    desc = `Mensual: dia ${rule.dayOfMonth ?? '?'} a las ${rule.startTime}`
   }
-  if (rule.recurrenceType === 'EVERY_N_DAYS') {
-    return `Cada ${rule.intervalDays ?? '?'} dias a las ${rule.startTime}`
-  }
-  return `Mensual: dia ${rule.dayOfMonth ?? '?'} a las ${rule.startTime}`
+  return desc
 }
 
 function describeDraftRule(rule: RuleFormItem) {
@@ -102,71 +123,91 @@ function describeDraftRule(rule: RuleFormItem) {
   return `Se repetira el dia ${rule.dayOfMonth ?? '?'} de cada mes a las ${rule.startTime}`
 }
 
+const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota'
+
 export function SeriesPage() {
   const queryClient = useQueryClient()
-  const [name, setName] = useState('')
-  const [timezone, setTimezone] = useState('America/Bogota')
-  const [location, setLocation] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [targetPlayers, setTargetPlayers] = useState(14)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [defaultTitle, setDefaultTitle] = useState('')
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE)
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
   const [rules, setRules] = useState<RuleFormItem[]>([createWeeklyRule()])
-  const [generateFrom, setGenerateFrom] = useState(new Date().toISOString().slice(0, 10))
-  const [generateTo, setGenerateTo] = useState(() => {
-    const toDate = new Date()
-    toDate.setDate(toDate.getDate() + 30)
-    return toDate.toISOString().slice(0, 10)
-  })
+  const [configLocation, setConfigLocation] = useState('')
+  const [configTargetPlayers, setConfigTargetPlayers] = useState(DEFAULT_TARGET_PLAYERS)
+  const [configDurationMinutes, setConfigDurationMinutes] = useState(DEFAULT_DURATION_MINUTES)
+  const [configTimezone, setConfigTimezone] = useState(DEFAULT_TIMEZONE)
 
   const seriesQuery = useQuery({
     queryKey: ['series'],
     queryFn: async () => (await apiClient.get<SeriesItem[]>('/api/v1/series')).data,
   })
 
-  const groupsQuery = useQuery({
-    queryKey: ['groups-for-series'],
-    queryFn: async () => (await apiClient.get<GroupItem[]>('/api/v1/groups')).data,
+  const configsQuery = useQuery({
+    queryKey: ['configs'],
+    queryFn: async () => (await apiClient.get<MatchConfigItem[]>('/api/v1/configs')).data,
   })
+
+  const buildRulesPayload = () =>
+    rules.map((rule) => ({
+      recurrenceType: rule.recurrenceType,
+      dayOfWeek: rule.recurrenceType === 'WEEKLY' ? rule.dayOfWeek : null,
+      intervalDays: rule.recurrenceType === 'EVERY_N_DAYS' ? rule.intervalDays : null,
+      dayOfMonth: rule.recurrenceType === 'MONTHLY_DAY_OF_MONTH' ? rule.dayOfMonth : null,
+      startTime: rule.startTime,
+    }))
+
+  const resetForm = () => {
+    setEditingId(null)
+    setDefaultTitle('')
+    setTimezone(DEFAULT_TIMEZONE)
+    setTargetGroupIds([])
+    setRules([createWeeklyRule()])
+    setConfigLocation('')
+    setConfigTargetPlayers(DEFAULT_TARGET_PLAYERS)
+    setConfigDurationMinutes(DEFAULT_DURATION_MINUTES)
+    setConfigTimezone(DEFAULT_TIMEZONE)
+  }
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const configResponse = await apiClient.post<MatchConfigItem>('/api/v1/configs', {
+        location: configLocation || null,
+        targetPlayers: configTargetPlayers,
+        durationMinutes: configDurationMinutes,
+        timezone: configTimezone,
+      })
+      const configId = configResponse.data.id
       await apiClient.post('/api/v1/series', {
-        name,
+        configId,
+        defaultTitle,
         timezone,
-        location: location || null,
-        targetPlayers,
         targetGroupIds,
-        startDate,
-        endDate: endDate || null,
-        rules: rules.map((rule) => ({
-          recurrenceType: rule.recurrenceType,
-          dayOfWeek: rule.recurrenceType === 'WEEKLY' ? rule.dayOfWeek : null,
-          intervalDays: rule.recurrenceType === 'EVERY_N_DAYS' ? rule.intervalDays : null,
-          dayOfMonth: rule.recurrenceType === 'MONTHLY_DAY_OF_MONTH' ? rule.dayOfMonth : null,
-          startTime: rule.startTime,
-        })),
+        rules: buildRulesPayload(),
       })
     },
     onSuccess: () => {
-      setName('')
-      setLocation('')
-      setStartDate('')
-      setEndDate('')
-      setTargetPlayers(14)
-      setTargetGroupIds([])
-      setRules([createWeeklyRule()])
+      resetForm()
       queryClient.invalidateQueries({ queryKey: ['series'] })
     },
   })
 
-  const generateMutation = useMutation({
-    mutationFn: async (seriesId: string) => {
-      await apiClient.post(
-        `/api/v1/series/${seriesId}/generate?from=${generateFrom}&to=${generateTo}`,
-      )
+  const updateMutation = useMutation({
+    mutationFn: async (payload: {
+      seriesId: string
+      data: {
+        configId?: string
+        defaultTitle: string
+        timezone: string
+        targetGroupIds: string[]
+        rules: ReturnType<typeof buildRulesPayload>
+        active?: boolean
+      }
+    }) => {
+      await apiClient.put(`/api/v1/series/${payload.seriesId}`, payload.data)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['series'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['series'] })
+    },
   })
 
   const deactivateMutation = useMutation({
@@ -176,18 +217,68 @@ export function SeriesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['series'] }),
   })
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    createMutation.mutate()
+  const startEditing = (series: SeriesItem) => {
+    setEditingId(series.id)
+    setDefaultTitle(series.defaultTitle)
+    setTimezone(series.timezone)
+    setTargetGroupIds(series.targetGroupIds ?? [])
+    setRules(series.rules.length > 0 ? series.rules.map(ruleFromSeries) : [createWeeklyRule()])
+    const config = configsQuery.data?.find((c) => c.id === series.configId)
+    if (config) {
+      setConfigLocation(config.location ?? '')
+      setConfigTargetPlayers(config.targetPlayers)
+      setConfigDurationMinutes(config.durationMinutes)
+      setConfigTimezone(config.timezone)
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
-  const onTargetPlayersChange = (value: string) => {
-    const parsed = Number(value)
-    if (!Number.isFinite(parsed)) {
-      setTargetPlayers(1)
+  const reactivateSeries = (series: SeriesItem) => {
+    updateMutation.mutate({
+      seriesId: series.id,
+      data: {
+        configId: series.configId,
+        defaultTitle: series.defaultTitle,
+        timezone: series.timezone,
+        targetGroupIds: series.targetGroupIds ?? [],
+        rules: series.rules.map((rule) => ({
+          recurrenceType: rule.recurrenceType,
+          dayOfWeek: rule.recurrenceType === 'WEEKLY' ? rule.dayOfWeek : null,
+          intervalDays: rule.recurrenceType === 'EVERY_N_DAYS' ? rule.intervalDays : null,
+          dayOfMonth: rule.recurrenceType === 'MONTHLY_DAY_OF_MONTH' ? rule.dayOfMonth : null,
+          startTime: rule.startTime,
+        })),
+        active: true,
+      },
+    })
+  }
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (editingId) {
+      const series = seriesQuery.data?.find((s) => s.id === editingId)
+      updateMutation.mutate(
+        {
+          seriesId: editingId,
+          data: {
+            configId: series?.configId,
+            defaultTitle,
+            timezone,
+            targetGroupIds,
+            rules: buildRulesPayload(),
+          },
+        },
+        {
+          onSuccess: () => {
+            resetForm()
+          },
+        },
+      )
       return
     }
-    setTargetPlayers(Math.max(1, Math.trunc(parsed)))
+    createMutation.mutate()
   }
 
   const updateRule = (ruleId: string, update: Partial<RuleFormItem>) => {
@@ -224,92 +315,122 @@ export function SeriesPage() {
     )
   }
 
+  const isEditing = editingId !== null
+  const formMutation = isEditing ? updateMutation : createMutation
+  const submitLabel = isEditing
+    ? updateMutation.isPending
+      ? 'Guardando...'
+      : 'Guardar cambios'
+    : createMutation.isPending
+      ? 'Creando...'
+      : 'Crear serie'
+
   return (
     <div className="space-y-6">
-      <ResponsiveSection title="Crear serie recurrente" description="Configura reglas semanales, cada N dias o mensual por dia del mes">
-        <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3" onSubmit={onSubmit}>
-          <div className="ui-muted-surface grid grid-cols-1 gap-3 p-3 md:col-span-3 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="ui-text-muted mb-1 block text-xs">Nombre de la serie</label>
-              <input className="ui-input" placeholder="Ej: Liga domingo maniana" value={name} onChange={(e) => setName(e.target.value)} required />
+      <ResponsiveSection
+        title={isEditing ? 'Editar serie' : 'Crear serie recurrente'}
+        description={
+          isEditing
+            ? 'Actualiza los datos y reglas de la serie. Los partidos ya generados no se modifican.'
+            : 'Configura reglas semanales, cada N dias o mensual por dia del mes'
+        }
+      >
+        <form className="mt-4 space-y-5" onSubmit={onSubmit}>
+          <div className="ui-section-card space-y-3">
+            <div className="ui-section-header">
+              <h3>Datos de la serie</h3>
             </div>
-            <div>
-              <label className="ui-text-muted mb-1 block text-xs">Zona horaria</label>
-              <select className="ui-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} required>
-                {timezoneOptions.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="ui-text-muted mb-1 block text-xs">Ubicacion del encuentro</label>
-              <input className="ui-input" placeholder="Cancha principal" value={location} onChange={(e) => setLocation(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="ui-muted-surface grid grid-cols-1 gap-3 p-3 md:col-span-3 md:grid-cols-3">
-            <div>
-              <label className="ui-text-muted mb-1 block text-xs">Fecha inicio</label>
-              <DateTimeField type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-            </div>
-            <div>
-              <label className="ui-text-muted mb-1 block text-xs">Fecha fin (opcional)</label>
-              <DateTimeField type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
-            <div>
-              <label className="ui-text-muted mb-1 block text-xs">Objetivo de plantilla</label>
-              <input
-                className="ui-input"
-                type="number"
-                min={1}
-                placeholder="14"
-                value={targetPlayers}
-                onChange={(e) => onTargetPlayersChange(e.target.value)}
-                required
-              />
-            </div>
-            <p className="ui-text-muted md:col-span-3 text-xs">
-              Deja fecha fin vacia para una serie indefinida. La asistencia de cada partido se cierra al llegar al objetivo.
-            </p>
-            <div className="md:col-span-3">
-              <p className="mb-2 text-sm font-medium">Grupos objetivo (opcional)</p>
-              <div className="flex flex-wrap gap-2">
-                {(groupsQuery.data ?? [])
-                  .filter((group) => group.active)
-                  .map((group) => (
-                    <label key={group.id} className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={targetGroupIds.includes(group.id)}
-                        onChange={() => toggleGroup(group.id)}
-                      />
-                      <span>{group.name}</span>
-                    </label>
-                  ))}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="ui-text-muted mb-1 block text-xs">Nombre de la serie</label>
+                <input className="ui-input" placeholder="Ej: Liga domingo maniana" value={defaultTitle} onChange={(e) => setDefaultTitle(e.target.value)} required />
               </div>
-              <p className="ui-text-muted mt-2 text-xs">
-                Si no seleccionas grupos, los partidos generados notificaran a todos los jugadores activos.
-              </p>
+              <div>
+                <label className="ui-text-muted mb-1 block text-xs">Zona horaria</label>
+                <select className="ui-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} required>
+                  {timezoneOptions.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="ui-muted-surface space-y-3 p-3 md:col-span-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Reglas de recurrencia</p>
-              <button
-                className="ui-button-muted"
-                type="button"
-                onClick={() => setRules((currentRules) => [...currentRules, createWeeklyRule()])}
-              >
-                Agregar regla
-              </button>
+          <div className="ui-section-card space-y-3">
+            <div className="ui-section-header">
+              <h3>Configuracion de plantilla</h3>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="ui-text-muted mb-1 block text-xs">Ubicacion</label>
+                <input
+                  className="ui-input"
+                  placeholder="Cancha principal"
+                  value={configLocation}
+                  onChange={(e) => setConfigLocation(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="ui-text-muted mb-1 block text-xs">Plantilla objetivo</label>
+                <input
+                  className="ui-input"
+                  type="number"
+                  min={1}
+                  value={configTargetPlayers}
+                  onChange={(e) => setConfigTargetPlayers(Math.max(1, Math.trunc(Number(e.target.value) || 1)))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="ui-text-muted mb-1 block text-xs">Duracion (minutos)</label>
+                <input
+                  className="ui-input"
+                  type="number"
+                  min={1}
+                  value={configDurationMinutes}
+                  onChange={(e) => setConfigDurationMinutes(Math.max(1, Math.trunc(Number(e.target.value) || 1)))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="ui-text-muted mb-1 block text-xs">Zona horaria de config</label>
+                <select className="ui-input" value={configTimezone} onChange={(e) => setConfigTimezone(e.target.value)} required>
+                  {timezoneOptions.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="ui-section-card space-y-3">
+            <div className="ui-section-header">
+              <h3>Grupos objetivo</h3>
+              <p>Opcional</p>
+            </div>
+            <GroupSelector
+              selectedGroupIds={targetGroupIds}
+              onToggleGroup={toggleGroup}
+            />
+            <p className="ui-text-muted text-xs">
+              Si no seleccionas grupos, los partidos generados notificaran a todos los jugadores activos.
+            </p>
+          </div>
+
+          <div className="ui-section-card space-y-3">
+            <div className="ui-section-header">
+              <h3>Reglas de recurrencia</h3>
+              <p>{rules.length} regla{rules.length !== 1 ? 's' : ''}</p>
             </div>
 
             <div className="space-y-3">
               {rules.map((rule, index) => (
-                <div key={rule.id} className="ui-card grid grid-cols-1 gap-2 p-3 md:grid-cols-8">
+                <div key={rule.id} className="ui-muted-surface grid grid-cols-1 gap-2 p-3 md:grid-cols-6">
                   <div>
                     <label className="ui-text-muted mb-1 block text-xs">Tipo</label>
                     <select
@@ -377,14 +498,14 @@ export function SeriesPage() {
                     />
                   </div>
 
-                  <div className="ui-muted-surface flex items-center rounded-lg px-3 py-2 md:col-span-3">
+                  <div className="ui-muted-surface flex items-center rounded-lg px-3 py-2 md:col-span-1">
                     <div>
                       <p className="text-xs font-medium">Regla #{index + 1}</p>
                       <p className="ui-text-muted text-xs">{describeDraftRule(rule)}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-end justify-end md:col-span-2">
+                  <div className="flex items-end justify-end md:col-span-1">
                     <button
                       className="ui-button-muted"
                       type="button"
@@ -399,51 +520,51 @@ export function SeriesPage() {
                 </div>
               ))}
             </div>
+
+            <button
+              className="ui-button-muted"
+              type="button"
+              onClick={() => setRules((currentRules) => [...currentRules, createWeeklyRule()])}
+            >
+              + Agregar regla
+            </button>
           </div>
 
-          <button className="ui-button md:col-span-3" type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Creando...' : 'Crear serie'}
-          </button>
-          {createMutation.isError && (
-            <p className="md:col-span-3 text-sm text-red-600">
-              {getApiErrorMessage(createMutation.error, 'No se pudo crear la serie.')}
+          <div className="flex flex-wrap gap-2">
+            <button className="ui-button" type="submit" disabled={formMutation.isPending}>
+              {submitLabel}
+            </button>
+            {isEditing && (
+              <button className="ui-button-muted" type="button" onClick={resetForm} disabled={updateMutation.isPending}>
+                Cancelar edicion
+              </button>
+            )}
+          </div>
+          {formMutation.isError && (
+            <p className="text-sm text-[var(--danger)]">
+              {getApiErrorMessage(
+                formMutation.error,
+                isEditing ? 'No se pudo actualizar la serie.' : 'No se pudo crear la serie.',
+              )}
             </p>
           )}
         </form>
       </ResponsiveSection>
 
       <ResponsiveSection title="Series creadas">
-        <div className="ui-muted-surface mb-4 grid grid-cols-1 gap-2 p-3 md:grid-cols-4">
-          <div>
-            <label className="ui-text-muted mb-1 block text-xs">Generar desde</label>
-            <DateTimeField type="date" value={generateFrom} onChange={(e) => setGenerateFrom(e.target.value)} />
-          </div>
-          <div>
-            <label className="ui-text-muted mb-1 block text-xs">Generar hasta</label>
-            <DateTimeField type="date" value={generateTo} onChange={(e) => setGenerateTo(e.target.value)} />
-          </div>
-          <p className="ui-text-muted md:col-span-2 self-center text-xs">
-            Rango manual para generar partidos. El scheduler tambien genera automaticamente una ventana futura.
-          </p>
-        </div>
         {seriesQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando series...</p>}
-        {seriesQuery.isError && <p className="mt-3 text-sm text-red-600">No se pudieron cargar las series.</p>}
+        {seriesQuery.isError && <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar las series.</p>}
         {seriesQuery.data && (
           <ResponsiveTable
             data={seriesQuery.data}
             rowKey={(series) => series.id}
             emptyMessage="No hay series registradas."
             columns={[
-              { key: 'name', label: 'Nombre', render: (series) => series.name },
+              { key: 'name', label: 'Nombre', render: (series) => series.defaultTitle },
               {
                 key: 'period',
                 label: 'Periodo',
-                render: (series) => `${series.startDate} - ${series.endDate ?? 'sin fin'}`,
-              },
-              {
-                key: 'target',
-                label: 'Plantilla objetivo',
-                render: (series) => series.targetPlayers ?? '-',
+                render: (series) => `${series.startDate} - ${series.endDate ?? 'En curso'}`,
               },
               {
                 key: 'groups',
@@ -455,13 +576,8 @@ export function SeriesPage() {
               },
               { key: 'creator', label: 'Creado por', render: (series) => series.createdByName ?? '-' },
               {
-                key: 'location',
-                label: 'Ubicacion',
-                render: (series) => series.location ?? '-',
-              },
-              {
                 key: 'rule',
-                label: 'Regla',
+                label: 'Reglas',
                 render: (series) => series.rules.map((rule) => describeRule(rule)).join(' | '),
               },
               { key: 'status', label: 'Estado', render: (series) => (series.active ? 'Activa' : 'Inactiva') },
@@ -471,55 +587,69 @@ export function SeriesPage() {
                 className: 'text-right',
                 render: (series) => (
                   <div className="space-x-2">
-                    <button className="ui-button-muted" onClick={() => generateMutation.mutate(series.id)} disabled={generateMutation.isPending}>
-                      {generateMutation.isPending ? 'Generando...' : 'Generar'}
+                    <button className="ui-button-muted" onClick={() => startEditing(series)}>
+                      Editar
                     </button>
-                    <button
-                      className="ui-button-muted"
-                      onClick={() => deactivateMutation.mutate(series.id)}
-                      disabled={!series.active || deactivateMutation.isPending}
-                    >
-                      {deactivateMutation.isPending ? 'Desactivando...' : 'Desactivar'}
-                    </button>
+                    {series.active ? (
+                      <button
+                        className="ui-button-muted"
+                        onClick={() => deactivateMutation.mutate(series.id)}
+                        disabled={deactivateMutation.isPending}
+                      >
+                        {deactivateMutation.isPending ? 'Desactivando...' : 'Desactivar'}
+                      </button>
+                    ) : (
+                      <button
+                        className="ui-button-muted"
+                        onClick={() => reactivateSeries(series)}
+                        disabled={updateMutation.isPending}
+                      >
+                        {updateMutation.isPending ? 'Reactivando...' : 'Reactivar'}
+                      </button>
+                    )}
                   </div>
                 ),
               },
             ]}
             renderMobileCard={(series) => (
               <div className="space-y-2 text-sm">
-                <p className="font-semibold">{series.name}</p>
+                <p className="font-semibold">{series.defaultTitle}</p>
                 <p className="ui-text-muted">
-                  {series.startDate} - {series.endDate ?? 'sin fin'}
+                  {series.startDate} - {series.endDate ?? 'En curso'}
                 </p>
-                <p className="ui-text-muted">Ubicacion: {series.location ?? '-'}</p>
-                <p className="ui-text-muted">Objetivo plantilla: {series.targetPlayers ?? '-'}</p>
                 <p className="ui-text-muted">
                   Grupos objetivo: {series.targetGroups && series.targetGroups.length > 0 ? series.targetGroups.map((group) => group.name).join(', ') : 'Todos'}
                 </p>
                 <div className="ui-card p-2 text-sm">
-                  {series.rules.map((rule) => (
-                    <p key={`${series.id}-${rule.recurrenceType}-${rule.dayOfWeek}-${rule.intervalDays}-${rule.dayOfMonth}-${rule.startTime}`}>
+                  {series.rules.map((rule, i) => (
+                    <p key={`${series.id}-${i}`}>
                       {describeRule(rule)}
                     </p>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <button className="ui-button-muted" onClick={() => generateMutation.mutate(series.id)}>
-                    Generar partidos
+                  <button className="ui-button-muted" onClick={() => startEditing(series)}>
+                    Editar
                   </button>
-                  <button className="ui-button-muted" onClick={() => deactivateMutation.mutate(series.id)} disabled={!series.active}>
-                    Desactivar
-                  </button>
+                  {series.active ? (
+                    <button className="ui-button-muted" onClick={() => deactivateMutation.mutate(series.id)}>
+                      Desactivar
+                    </button>
+                  ) : (
+                    <button className="ui-button-muted" onClick={() => reactivateSeries(series)}>
+                      Reactivar
+                    </button>
+                  )}
                 </div>
               </div>
             )}
           />
         )}
       </ResponsiveSection>
-      {(generateMutation.isError || deactivateMutation.isError) && (
-        <p className="text-sm text-red-600">
+      {(deactivateMutation.isError || updateMutation.isError) && (
+        <p className="text-sm text-[var(--danger)]">
           {getApiErrorMessage(
-            generateMutation.error ?? deactivateMutation.error,
+            deactivateMutation.error ?? updateMutation.error,
             'No se pudo completar la accion sobre la serie.',
           )}
         </p>

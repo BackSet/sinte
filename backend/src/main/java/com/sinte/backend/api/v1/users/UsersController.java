@@ -2,7 +2,6 @@ package com.sinte.backend.api.v1.users;
 
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.UserRole;
-import com.sinte.backend.domain.enums.PlayerPosition;
 import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.repository.RoleRepository;
 import com.sinte.backend.repository.UserRepository;
@@ -12,7 +11,6 @@ import com.sinte.backend.service.UserHandleService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
@@ -88,11 +86,8 @@ public class UsersController {
                 request.phone(),
                 request.nickname(),
                 null,
-                request.primaryPosition(),
-                request.secondaryPosition(),
                 passwordEncoder.encode(request.password())
         );
-        validatePositions(request.primaryPosition(), request.secondaryPosition());
         userHandleService.ensureHandle(user, null);
         User saved = userRepository.save(user);
 
@@ -117,9 +112,6 @@ public class UsersController {
         user.setEmail(normalizedEmail);
         user.setPhone(request.phone());
         user.setNickname(request.nickname());
-        user.setPrimaryPosition(request.primaryPosition());
-        user.setSecondaryPosition(request.secondaryPosition());
-        validatePositions(request.primaryPosition(), request.secondaryPosition());
         userHandleService.ensureHandle(user, userId);
         User saved = userRepository.save(user);
         return ResponseEntity.ok(toResponse(saved));
@@ -156,8 +148,6 @@ public class UsersController {
                 user.getNickname(),
                 user.getNicknameTag(),
                 userHandleService.buildHandle(user.getNickname(), user.getNicknameTag()),
-                user.getPrimaryPosition(),
-                user.getSecondaryPosition(),
                 user.isActive(),
                 roles
         );
@@ -171,8 +161,6 @@ public class UsersController {
             String nickname,
             String nicknameTag,
             String playerHandle,
-            PlayerPosition primaryPosition,
-            PlayerPosition secondaryPosition,
             boolean active,
             List<String> roles
     ) {
@@ -183,8 +171,6 @@ public class UsersController {
             @NotBlank @Email @Size(max = 180) String email,
             @NotBlank @Size(max = 30) String phone,
             @Size(max = 80) String nickname,
-            @NotNull PlayerPosition primaryPosition,
-            PlayerPosition secondaryPosition,
             @NotBlank @Size(min = 8, max = 120) String password,
             RoleCode initialRole
     ) {
@@ -194,15 +180,7 @@ public class UsersController {
             @NotBlank @Size(max = 120) String fullName,
             @NotBlank @Email @Size(max = 180) String email,
             @NotBlank @Size(max = 30) String phone,
-            @Size(max = 80) String nickname,
-            @NotNull PlayerPosition primaryPosition,
-            PlayerPosition secondaryPosition
+            @Size(max = 80) String nickname
     ) {
-    }
-
-    private void validatePositions(PlayerPosition primaryPosition, PlayerPosition secondaryPosition) {
-        if (secondaryPosition != null && secondaryPosition == primaryPosition) {
-            throw new DomainException("La posicion secundaria debe ser distinta de la principal");
-        }
     }
 }

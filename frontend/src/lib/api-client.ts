@@ -1,6 +1,5 @@
 import axios, { AxiosError } from 'axios'
 import { useAuthStore } from '../store/auth-store'
-import type { PlayerPosition } from './player-positions'
 
 type RefreshResponse = {
   userId: string
@@ -9,8 +8,6 @@ type RefreshResponse = {
   nickname?: string
   nicknameTag?: string
   playerHandle?: string
-  primaryPosition?: PlayerPosition
-  secondaryPosition?: PlayerPosition
   roles: string[]
   accessToken: string
   refreshToken: string
@@ -65,8 +62,8 @@ apiClient.interceptors.response.use(
     }
 
     originalRequest._retry = true
-    const { refreshToken, clearAuth, setSession, user } = useAuthStore.getState()
-    if (!refreshToken || !user) {
+    const { refreshToken, clearAuth, setSession } = useAuthStore.getState()
+    if (!refreshToken) {
       clearAuth()
       throw error
     }
@@ -92,8 +89,6 @@ apiClient.interceptors.response.use(
           nickname: refreshed.nickname,
           nicknameTag: refreshed.nicknameTag,
           playerHandle: refreshed.playerHandle,
-          primaryPosition: refreshed.primaryPosition,
-          secondaryPosition: refreshed.secondaryPosition,
           roles: refreshed.roles,
         },
       })

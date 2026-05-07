@@ -9,15 +9,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "match_team_players",
-        uniqueConstraints = @UniqueConstraint(name = "uk_match_team_players", columnNames = {"team_id", "user_id"})
-)
+@Table(name = "match_team_players")
 public class MatchTeamPlayer {
 
     @Id
@@ -28,9 +24,13 @@ public class MatchTeamPlayer {
     @JoinColumn(name = "team_id", nullable = false)
     private MatchTeam team;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @ManyToOne
+    @JoinColumn(name = "guest_player_id")
+    private GuestPlayer guestPlayer;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -41,6 +41,11 @@ public class MatchTeamPlayer {
     public MatchTeamPlayer(MatchTeam team, User user) {
         this.team = team;
         this.user = user;
+    }
+
+    public MatchTeamPlayer(MatchTeam team, GuestPlayer guestPlayer) {
+        this.team = team;
+        this.guestPlayer = guestPlayer;
     }
 
     @PrePersist
@@ -58,5 +63,34 @@ public class MatchTeamPlayer {
 
     public User getUser() {
         return user;
+    }
+
+    public GuestPlayer getGuestPlayer() {
+        return guestPlayer;
+    }
+
+    public boolean isGuest() {
+        return guestPlayer != null;
+    }
+
+    public String getPlayerName() {
+        if (user != null) {
+            return user.getFullName();
+        }
+        if (guestPlayer != null) {
+            return guestPlayer.getFullName();
+        }
+        return null;
+    }
+
+    public String getPlayerHandle() {
+        if (user != null) {
+            return user.getPlayerHandle();
+        }
+        return null;
+    }
+
+    public String getPrimaryPosition() {
+        return null;
     }
 }

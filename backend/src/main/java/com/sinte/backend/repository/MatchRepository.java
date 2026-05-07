@@ -16,6 +16,30 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     boolean existsBySeriesIdAndStartsAt(UUID seriesId, OffsetDateTime startsAt);
 
+    List<Match> findBySeriesIdAndStatus(UUID seriesId, MatchStatus status);
+
+    @Query("""
+           SELECT DISTINCT m
+           FROM Match m
+           JOIN MatchAttendance ma ON ma.match.id = m.id
+           WHERE ma.user.id = :userId
+           ORDER BY m.startsAt ASC
+           """)
+    List<Match> findUserMatches(@Param("userId") UUID userId);
+
+    @Query("""
+           SELECT DISTINCT m
+           FROM Match m
+           JOIN MatchAttendance ma ON ma.match.id = m.id
+           WHERE ma.user.id = :userId
+             AND m.status = :status
+           ORDER BY m.startsAt ASC
+           """)
+    List<Match> findUserMatchesByStatus(
+            @Param("userId") UUID userId,
+            @Param("status") MatchStatus status
+    );
+
     @Query("""
            SELECT DISTINCT m
            FROM Match m
@@ -23,10 +47,25 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
            WHERE ma.user.id = :userId
              AND (:from IS NULL OR m.startsAt >= :from)
              AND (:to IS NULL OR m.startsAt <= :to)
-             AND (:status IS NULL OR m.status = :status)
            ORDER BY m.startsAt ASC
            """)
-    List<Match> findUserMatches(
+    List<Match> findUserMatchesByRange(
+            @Param("userId") UUID userId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
+    );
+
+    @Query("""
+           SELECT DISTINCT m
+           FROM Match m
+           JOIN MatchAttendance ma ON ma.match.id = m.id
+           WHERE ma.user.id = :userId
+             AND (:from IS NULL OR m.startsAt >= :from)
+             AND (:to IS NULL OR m.startsAt <= :to)
+             AND m.status = :status
+           ORDER BY m.startsAt ASC
+           """)
+    List<Match> findUserMatchesByRangeAndStatus(
             @Param("userId") UUID userId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,

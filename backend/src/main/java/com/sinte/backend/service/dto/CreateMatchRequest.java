@@ -6,11 +6,10 @@ import java.util.UUID;
 
 public record CreateMatchRequest(
         UUID createdByUserId,
+        UUID configId,
         String title,
         String description,
-        String location,
         OffsetDateTime startsAt,
-        OffsetDateTime endsAt,
         List<UUID> targetGroupIds
 ) {
 }

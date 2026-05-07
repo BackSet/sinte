@@ -102,7 +102,7 @@ public class GroupService {
         if (sinteGroupMemberRepository.existsByGroupIdAndUserId(group.getId(), user.getId())) {
             throw new DomainException("El jugador ya pertenece al grupo");
         }
-        return sinteGroupMemberRepository.save(new SinteGroupMember(group, user, requester));
+        return sinteGroupMemberRepository.save(new SinteGroupMember(group, user));
     }
 
     @Transactional

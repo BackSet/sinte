@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { clearSession, readSession, writeSession } from '../lib/session'
-import type { PlayerPosition } from '../lib/player-positions'
 
 export type AuthUser = {
   userId: string
@@ -10,8 +9,6 @@ export type AuthUser = {
   nickname?: string
   nicknameTag?: string
   playerHandle?: string
-  primaryPosition?: PlayerPosition
-  secondaryPosition?: PlayerPosition
   roles: string[]
 }
 
@@ -31,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   hydrated: false,
   setSession: ({ accessToken, refreshToken, user }) => {
-    writeSession({ accessToken, refreshToken })
+    writeSession({ accessToken, refreshToken, user })
     set({ accessToken, refreshToken, user })
   },
   clearAuth: () => {
@@ -43,6 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       accessToken: session?.accessToken ?? null,
       refreshToken: session?.refreshToken ?? null,
+      user: session?.user ?? null,
       hydrated: true,
     })
   },

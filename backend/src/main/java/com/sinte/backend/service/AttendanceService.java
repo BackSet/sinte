@@ -4,8 +4,8 @@ import com.sinte.backend.domain.Match;
 import com.sinte.backend.domain.MatchAttendance;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.enums.AttendanceStatus;
+import com.sinte.backend.domain.enums.MatchStatus;
 import com.sinte.backend.repository.MatchAttendanceRepository;
-import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.service.dto.AttendanceResponseRequest;
 import java.util.List;
 import java.util.UUID;
@@ -16,11 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class AttendanceService {
 
     private final MatchAttendanceRepository matchAttendanceRepository;
-    private final MatchRepository matchRepository;
 
-    public AttendanceService(MatchAttendanceRepository matchAttendanceRepository, MatchRepository matchRepository) {
+    public AttendanceService(MatchAttendanceRepository matchAttendanceRepository) {
         this.matchAttendanceRepository = matchAttendanceRepository;
-        this.matchRepository = matchRepository;
     }
 
     @Transactional
@@ -43,14 +41,16 @@ public class AttendanceService {
                 .findByMatchIdAndUserId(request.matchId(), request.userId())
                 .orElseThrow(() -> new DomainException("No existe registro de asistencia para el usuario/partido"));
 
+        if (attendance.getMatch().getStatus() == MatchStatus.FINISHED) {
+            throw new DomainException("No se puede responder asistencia de un partido finalizado");
+        }
+
         if (!attendance.getMatch().isAttendanceOpen()) {
             throw new DomainException("La asistencia de este partido esta cerrada");
         }
 
         attendance.respond(request.status(), request.comment());
-        MatchAttendance saved = matchAttendanceRepository.save(attendance);
-        recalculateAttendanceState(saved.getMatch());
-        return saved;
+        return matchAttendanceRepository.save(attendance);
     }
 
     @Transactional
@@ -58,27 +58,17 @@ public class AttendanceService {
         MatchAttendance attendance = matchAttendanceRepository
                 .findByMatchIdAndUserId(matchId, userId)
                 .orElseThrow(() -> new DomainException("No existe registro de asistencia para el usuario/partido"));
+
+        if (attendance.getMatch().getStatus() == MatchStatus.FINISHED) {
+            throw new DomainException("No se puede desconfirmar asistencia de un partido finalizado");
+        }
+
         attendance.resetToPending();
-        MatchAttendance saved = matchAttendanceRepository.save(attendance);
-        recalculateAttendanceState(saved.getMatch());
-        return saved;
+        return matchAttendanceRepository.save(attendance);
     }
 
     @Transactional(readOnly = true)
     public List<MatchAttendance> getAttendanceByMatch(UUID matchId) {
         return matchAttendanceRepository.findByMatchIdOrderByStatusAsc(matchId);
-    }
-
-    private void recalculateAttendanceState(Match match) {
-        Integer targetPlayers = match.getTargetPlayers();
-        if (targetPlayers == null || targetPlayers <= 0) {
-            return;
-        }
-        long confirmedYes = matchAttendanceRepository.countByMatchIdAndStatus(match.getId(), AttendanceStatus.YES);
-        boolean shouldBeOpen = confirmedYes < targetPlayers;
-        if (match.isAttendanceOpen() != shouldBeOpen) {
-            match.updateAttendanceOpen(shouldBeOpen);
-            matchRepository.save(match);
-        }
     }
 }

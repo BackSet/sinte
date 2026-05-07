@@ -8,9 +8,8 @@ import com.sinte.backend.repository.MatchSeriesRuleRepository;
 import com.sinte.backend.service.MatchService;
 import com.sinte.backend.service.dto.CreateMatchSeriesRequest;
 import com.sinte.backend.service.dto.SeriesRuleRequest;
+import com.sinte.backend.service.dto.UpdateMatchSeriesRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -18,16 +17,15 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -47,12 +45,9 @@ public class SeriesController {
     public ResponseEntity<SeriesResponse> create(@Valid @RequestBody CreateSeriesApiRequest request) {
         CreateMatchSeriesRequest serviceRequest = new CreateMatchSeriesRequest(
                 SecurityUtils.currentUserId(),
-                request.name(),
-                request.startDate(),
-                request.endDate(),
+                request.configId(),
+                request.defaultTitle(),
                 request.timezone(),
-                request.location(),
-                request.targetPlayers(),
                 request.targetGroupIds(),
                 request.rules().stream().map(this::toServiceRule).toList()
         );
@@ -60,23 +55,29 @@ public class SeriesController {
         return ResponseEntity.ok(toResponse(series));
     }
 
+    @PutMapping("/{seriesId}")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<SeriesResponse> update(
+            @PathVariable UUID seriesId,
+            @Valid @RequestBody UpdateSeriesApiRequest request
+    ) {
+        UpdateMatchSeriesRequest serviceRequest = new UpdateMatchSeriesRequest(
+                SecurityUtils.currentUserId(),
+                request.configId(),
+                request.defaultTitle(),
+                request.timezone(),
+                request.targetGroupIds(),
+                request.rules().stream().map(this::toServiceRule).toList(),
+                request.active()
+        );
+        MatchSeries series = matchService.updateSeries(seriesId, serviceRequest);
+        return ResponseEntity.ok(toResponse(series));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<List<SeriesResponse>> list() {
         return ResponseEntity.ok(matchService.listSeries().stream().map(this::toResponse).toList());
-    }
-
-    @PostMapping("/{seriesId}/generate")
-    @PreAuthorize("hasAnyRole('DT','ADMIN')")
-    public ResponseEntity<List<GeneratedMatchResponse>> generate(
-            @PathVariable UUID seriesId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
-    ) {
-        List<GeneratedMatchResponse> generated = matchService.generateMatchesFromSeries(seriesId, from, to).stream()
-                .map(match -> new GeneratedMatchResponse(match.getId(), match.getTitle(), match.getStartsAt(), match.getEndsAt()))
-                .toList();
-        return ResponseEntity.ok(generated);
     }
 
     @DeleteMapping("/{seriesId}")
@@ -105,12 +106,11 @@ public class SeriesController {
                 series.getId(),
                 series.getCreatedBy().getId(),
                 series.getCreatedBy().getFullName(),
-                series.getName(),
+                series.getDefaultTitle(),
                 series.getStartDate(),
                 series.getEndDate(),
                 series.getTimezone(),
-                series.getLocation(),
-                series.getTargetPlayers(),
+                series.getConfig() != null ? series.getConfig().getId() : null,
                 matchService.getSeriesTargetGroupIds(series.getId()),
                 matchService.getSeriesTargetGroups(series.getId()).stream()
                         .map(group -> new GroupSummaryResponse(group.id(), group.name()))
@@ -132,22 +132,29 @@ public class SeriesController {
     }
 
     public record CreateSeriesApiRequest(
-            @NotBlank String name,
-            @NotNull LocalDate startDate,
-            LocalDate endDate,
+            @NotNull UUID configId,
+            @NotBlank String defaultTitle,
             @NotBlank String timezone,
-            String location,
-            @NotNull @Min(1) Integer targetPlayers,
             List<UUID> targetGroupIds,
             @NotEmpty List<@Valid SeriesRuleApiRequest> rules
     ) {
     }
 
+    public record UpdateSeriesApiRequest(
+            UUID configId,
+            String defaultTitle,
+            String timezone,
+            List<UUID> targetGroupIds,
+            @NotEmpty List<@Valid SeriesRuleApiRequest> rules,
+            Boolean active
+    ) {
+    }
+
     public record SeriesRuleApiRequest(
             @NotNull RecurrenceType recurrenceType,
-            @Min(1) @Max(7) Short dayOfWeek,
-            @Min(1) Integer intervalDays,
-            @Min(1) @Max(31) Short dayOfMonth,
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(7) Short dayOfWeek,
+            @jakarta.validation.constraints.Min(1) Integer intervalDays,
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(31) Short dayOfMonth,
             @NotNull LocalTime startTime
     ) {
     }
@@ -165,12 +172,11 @@ public class SeriesController {
             UUID id,
             UUID createdByUserId,
             String createdByName,
-            String name,
+            String defaultTitle,
             LocalDate startDate,
             LocalDate endDate,
             String timezone,
-            String location,
-            Integer targetPlayers,
+            UUID configId,
             List<UUID> targetGroupIds,
             List<GroupSummaryResponse> targetGroups,
             boolean active,
@@ -185,6 +191,4 @@ public class SeriesController {
     ) {
     }
 
-    public record GeneratedMatchResponse(UUID matchId, String title, java.time.OffsetDateTime startsAt, java.time.OffsetDateTime endsAt) {
-    }
 }

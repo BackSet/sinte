@@ -5,7 +5,20 @@ import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { DateTimeField } from '../../components/ui/DateTimeField'
+import { GroupSelector } from '../../components/ui/GroupSelector'
+import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { useToastStore } from '../../store/toast-store'
 import { useAuthStore } from '../../store/auth-store'
+import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
+
+const POSITION_LABELS: Record<string, string> = Object.fromEntries(
+  PLAYER_POSITION_OPTIONS.map((opt) => [opt.value, opt.label]),
+)
+
+function positionLabel(code: string | undefined | null): string {
+  if (!code || code === 'SIN_POSICION') return 'Sin posicion'
+  return POSITION_LABELS[code] ?? code
+}
 
 type MatchItem = {
   id: string
@@ -15,7 +28,9 @@ type MatchItem = {
   startsAt: string
   endsAt?: string | null
   status: string
-  sourceType: string
+  sourceType: 'MANUAL' | 'SERIES'
+  configId: string
+  seriesId?: string
   targetGroupIds?: string[]
   targetGroups?: Array<{ id: string; name: string }>
   confirmedCount: number
@@ -23,25 +38,69 @@ type MatchItem = {
   targetPlayers?: number
 }
 
-type GroupItem = {
+type MatchConfigItem = {
   id: string
-  name: string
-  active: boolean
+  location?: string
+  targetPlayers: number
+  durationMinutes: number
+  timezone: string
+  description?: string
 }
 
+const DEFAULT_TARGET_PLAYERS = 14
+const DEFAULT_DURATION_MINUTES = 90
+
+const timezoneOptions = [
+  'America/Bogota',
+  'America/Mexico_City',
+  'America/Lima',
+  'America/Santiago',
+  'America/Buenos_Aires',
+  'America/Montevideo',
+  'America/Caracas',
+  'America/Panama',
+  'America/Guayaquil',
+  'America/La_Paz',
+  'America/Asuncion',
+  'America/Sao_Paulo',
+  'America/New_York',
+  'Europe/Madrid',
+]
+
 type ConfirmedPlayer = {
-  userId: string
+  userId: string | null
+  guestPlayerId: string | null
   fullName: string
-  email: string
+  email: string | null
   playerHandle?: string
-  primaryPosition?: string
+}
+
+type ConfirmedPlayersResponse = {
+  players: ConfirmedPlayer[]
+}
+
+type RosterPlayer = {
+  userId: string | null
+  guestPlayerId: string | null
+  fullName: string
+  email: string | null
+  playerHandle?: string | null
+  primaryPositionCode: string
+  respondedAt?: string
+}
+
+type RosterResponse = {
+  roster: RosterPlayer[]
+  waitlist: RosterPlayer[]
+  cancelled: RosterPlayer[]
 }
 
 type TeamPlayer = {
-  userId: string
+  userId: string | null
+  guestPlayerId: string | null
   fullName: string
-  playerHandle?: string
-  primaryPosition?: string
+  playerHandle?: string | null
+  primaryPositionCode: string
 }
 
 type Team = {
@@ -54,6 +113,7 @@ type TeamDraft = {
   teamNumber: number
   name: string
   playerIds: string[]
+  guestPlayerIds: string[]
 }
 
 function toDateTimeLocalValue(value: string): string {
@@ -62,23 +122,42 @@ function toDateTimeLocalValue(value: string): string {
   return iso.slice(0, 16)
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return 'Sin hora fin'
+function isMatchClosed(match: MatchItem): boolean {
+  if (match.status !== 'SCHEDULED') {
+    return true
   }
-  return toDateTimeLocalValue(value).replace('T', ' ')
+  if (match.targetPlayers != null && match.confirmedCount >= match.targetPlayers) {
+    return true
+  }
+  return false
+}
+
+function statusLabel(match: MatchItem): string {
+  if (match.status === 'FINISHED') return 'Finalizado'
+  if (match.status === 'CANCELLED') return 'Cancelado'
+  if (isMatchClosed(match)) return 'Cerrado'
+  return 'Programado'
+}
+
+function sourceTypeLabel(sourceType: string): string {
+  if (sourceType === 'SERIES') return 'Serie'
+  return 'Manual'
 }
 
 export function MatchesPage() {
   const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
+  const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
   const user = useAuthStore((state) => state.user)
   const canManageTeams = user?.roles.some((role) => role === 'DT' || role === 'ADMIN')
   const isManager = Boolean(canManageTeams)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('')
   const [startsAt, setStartsAt] = useState('')
-  const [endsAt, setEndsAt] = useState('')
+  const [configLocation, setConfigLocation] = useState('')
+  const [configTargetPlayers, setConfigTargetPlayers] = useState(DEFAULT_TARGET_PLAYERS)
+  const [configDurationMinutes, setConfigDurationMinutes] = useState(DEFAULT_DURATION_MINUTES)
+  const [configTimezone, setConfigTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
   const [selectedMatchId, setSelectedMatchId] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SCHEDULED' | 'CANCELLED'>('ALL')
@@ -90,16 +169,12 @@ export function MatchesPage() {
     queryFn: async () => (await apiClient.get<MatchItem[]>('/api/v1/matches')).data,
   })
 
-  const groupsQuery = useQuery({
-    queryKey: ['groups-for-matches'],
-    queryFn: async () => (await apiClient.get<GroupItem[]>('/api/v1/groups')).data,
-    enabled: isManager,
-  })
-
   const confirmedQuery = useQuery({
     queryKey: ['match-confirmed', selectedMatchId],
-    queryFn: async () =>
-      (await apiClient.get<ConfirmedPlayer[]>(`/api/v1/matches/${selectedMatchId}/confirmed`)).data,
+    queryFn: async () => {
+      const res = await apiClient.get<ConfirmedPlayersResponse>(`/api/v1/matches/${selectedMatchId}/confirmed`)
+      return res.data.players
+    },
     enabled: Boolean(selectedMatchId),
   })
 
@@ -109,25 +184,45 @@ export function MatchesPage() {
     enabled: Boolean(selectedMatchId),
   })
 
+  const rosterQuery = useQuery({
+    queryKey: ['match-roster', selectedMatchId],
+    queryFn: async () =>
+      (await apiClient.get<RosterResponse>(`/api/v1/matches/${selectedMatchId}/roster`)).data,
+    enabled: Boolean(selectedMatchId),
+  })
+
   const createMutation = useMutation({
     mutationFn: async () => {
+      const configResponse = await apiClient.post<MatchConfigItem>('/api/v1/configs', {
+        location: configLocation || null,
+        targetPlayers: configTargetPlayers,
+        durationMinutes: configDurationMinutes,
+        timezone: configTimezone,
+        description: description || null,
+      })
+      const configId = configResponse.data.id
       await apiClient.post('/api/v1/matches', {
-        title,
-        description,
-        location,
+        configId,
+        title: title.trim() || null,
+        description: description || null,
         startsAt: new Date(startsAt).toISOString(),
-        endsAt: new Date(endsAt).toISOString(),
         targetGroupIds,
       })
     },
     onSuccess: () => {
       setTitle('')
       setDescription('')
-      setLocation('')
       setStartsAt('')
-      setEndsAt('')
+      setConfigLocation('')
+      setConfigTargetPlayers(DEFAULT_TARGET_PLAYERS)
+      setConfigDurationMinutes(DEFAULT_DURATION_MINUTES)
+      setConfigTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota')
       setTargetGroupIds([])
+      addToast('success', 'Partido creado correctamente')
       queryClient.invalidateQueries({ queryKey: ['matches'] })
+    },
+    onError: (error) => {
+      addToast('error', getApiErrorMessage(error, 'No se pudo crear el partido'))
     },
   })
 
@@ -146,7 +241,8 @@ export function MatchesPage() {
         teams.map((team) => ({
           teamNumber: team.teamNumber,
           name: team.name,
-          playerIds: team.players.map((player) => player.userId),
+          playerIds: team.players.filter((p) => p.userId).map((p) => p.userId!),
+          guestPlayerIds: team.players.filter((p) => p.guestPlayerId).map((p) => p.guestPlayerId!),
         })),
       )
       queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatchId] })
@@ -160,6 +256,7 @@ export function MatchesPage() {
           teamNumber: team.teamNumber,
           name: team.name,
           playerIds: team.playerIds,
+          guestPlayerIds: team.guestPlayerIds,
         })),
       })
     },
@@ -202,24 +299,46 @@ export function MatchesPage() {
       teamsQuery.data.map((team) => ({
         teamNumber: team.teamNumber,
         name: team.name,
-        playerIds: team.players.map((player) => player.userId),
+        playerIds: team.players.filter((p) => p.userId).map((p) => p.userId!),
+        guestPlayerIds: team.players.filter((p) => p.guestPlayerId).map((p) => p.guestPlayerId!),
       })),
     )
   }, [teamsQuery.data])
 
-  const toggleDraftPlayer = (teamNumber: number, playerId: string) => {
+  const handleCancelMatch = async (match: MatchItem) => {
+    const confirmed = await requestConfirm({
+      title: 'Cancelar partido',
+      description: `Seguro que deseas cancelar "${match.title}"? Esta accion no se puede deshacer.`,
+      confirmLabel: 'Cancelar partido',
+      variant: 'danger',
+    })
+    if (confirmed) {
+      cancelMutation.mutate(match.id)
+    }
+  }
+
+  const toggleDraftPlayer = (teamNumber: number, playerId: string, isGuest: boolean) => {
     setDraftTeams((current) =>
       current.map((team) => {
         if (team.teamNumber !== teamNumber) {
           return {
             ...team,
-            playerIds: team.playerIds.filter((id) => id !== playerId),
+            playerIds: isGuest ? team.playerIds : team.playerIds.filter((id) => id !== playerId),
+            guestPlayerIds: isGuest ? team.guestPlayerIds.filter((id) => id !== playerId) : team.guestPlayerIds,
           }
         }
-        const exists = team.playerIds.includes(playerId)
-        return {
-          ...team,
-          playerIds: exists ? team.playerIds.filter((id) => id !== playerId) : [...team.playerIds, playerId],
+        if (isGuest) {
+          const exists = team.guestPlayerIds.includes(playerId)
+          return {
+            ...team,
+            guestPlayerIds: exists ? team.guestPlayerIds.filter((id) => id !== playerId) : [...team.guestPlayerIds, playerId],
+          }
+        } else {
+          const exists = team.playerIds.includes(playerId)
+          return {
+            ...team,
+            playerIds: exists ? team.playerIds.filter((id) => id !== playerId) : [...team.playerIds, playerId],
+          }
         }
       }),
     )
@@ -230,43 +349,133 @@ export function MatchesPage() {
     statusFilter === 'ALL' ? true : match.status === statusFilter,
   )
   const assignedPlayerIds = new Set(draftTeams.flatMap((team) => team.playerIds))
-  const unassignedPlayers = (confirmedQuery.data ?? []).filter((player) => !assignedPlayerIds.has(player.userId))
+  const assignedGuestIds = new Set(draftTeams.flatMap((team) => team.guestPlayerIds))
+  const unassignedPlayers = (confirmedQuery.data ?? []).filter(
+    (p) => p.userId && !assignedPlayerIds.has(p.userId) && !assignedGuestIds.has(p.guestPlayerId ?? ''),
+  )
 
   return (
     <div className="space-y-6">
+      {ConfirmDialogComponent}
+
       {isManager && (
-        <ResponsiveSection title="Gestion de partidos" description="Programa partidos manuales con horario y lugar">
-          <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-            <input className="ui-input" placeholder="Titulo" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            <input className="ui-input" placeholder="Ubicacion" value={location} onChange={(e) => setLocation(e.target.value)} />
-            <textarea className="ui-input md:col-span-2" placeholder="Descripcion" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <DateTimeField type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required />
-            <DateTimeField type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required />
-            <div className="ui-muted-surface md:col-span-2 rounded-lg p-3">
-              <p className="mb-2 text-sm font-medium">Grupos objetivo (opcional)</p>
-              <div className="flex flex-wrap gap-2">
-                {(groupsQuery.data ?? [])
-                  .filter((group) => group.active)
-                  .map((group) => (
-                    <label key={group.id} className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={targetGroupIds.includes(group.id)}
-                        onChange={() => toggleGroup(group.id)}
-                      />
-                      <span>{group.name}</span>
-                    </label>
-                  ))}
+        <ResponsiveSection
+          title="Crear partido manual"
+          description="Alternativa rapida a una serie. El partido cierra automaticamente al llenar la plantilla."
+        >
+          <form className="mt-4 space-y-5" onSubmit={onSubmit}>
+            <div className="ui-section-card space-y-3">
+              <div className="ui-section-header">
+                <h3>Datos del partido</h3>
               </div>
-              <p className="ui-text-muted mt-2 text-xs">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="ui-text-muted mb-1 block text-xs">Titulo</label>
+                  <input
+                    className="ui-input"
+                    placeholder="Ej: Partido sabado"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ui-text-muted mb-1 block text-xs">Fecha y hora del encuentro</label>
+                  <DateTimeField
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="ui-text-muted mb-1 block text-xs">Descripcion (opcional)</label>
+                  <textarea
+                    className="ui-input"
+                    placeholder="Notas para los jugadores"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="ui-section-card space-y-3">
+              <div className="ui-section-header">
+                <h3>Configuracion de plantilla</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="ui-text-muted mb-1 block text-xs">Ubicacion</label>
+                  <input
+                    className="ui-input"
+                    placeholder="Cancha principal"
+                    value={configLocation}
+                    onChange={(e) => setConfigLocation(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ui-text-muted mb-1 block text-xs">Plantilla objetivo</label>
+                  <input
+                    className="ui-input"
+                    type="number"
+                    min={1}
+                    value={configTargetPlayers}
+                    onChange={(e) =>
+                      setConfigTargetPlayers(Math.max(1, Math.trunc(Number(e.target.value) || 1)))
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ui-text-muted mb-1 block text-xs">Duracion (minutos)</label>
+                  <input
+                    className="ui-input"
+                    type="number"
+                    min={1}
+                    value={configDurationMinutes}
+                    onChange={(e) =>
+                      setConfigDurationMinutes(Math.max(1, Math.trunc(Number(e.target.value) || 1)))
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="ui-text-muted mb-1 block text-xs">Zona horaria</label>
+                  <select className="ui-input" value={configTimezone} onChange={(e) => setConfigTimezone(e.target.value)} required>
+                    {timezoneOptions.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {zone}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <p className="ui-text-muted text-xs">
+                El partido cierra automaticamente al alcanzar la plantilla objetivo. Al llegar la fecha del encuentro se cierra y no se puede modificar.
+              </p>
+            </div>
+
+            <div className="ui-section-card space-y-3">
+              <div className="ui-section-header">
+                <h3>Grupos objetivo</h3>
+                <p>Opcional</p>
+              </div>
+              <GroupSelector
+                selectedGroupIds={targetGroupIds}
+                onToggleGroup={toggleGroup}
+              />
+              <p className="ui-text-muted text-xs">
                 Si no seleccionas grupos, la convocatoria se enviara a todos los jugadores activos.
               </p>
             </div>
-            <button className="ui-button md:col-span-2" type="submit" disabled={createMutation.isPending}>
+
+            <button className="ui-button" type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? 'Creando...' : 'Crear partido'}
             </button>
             {createMutation.isError && (
-              <p className="md:col-span-2 text-sm text-red-600">
+              <p className="text-sm text-[var(--danger)]">
                 {getApiErrorMessage(createMutation.error, 'No se pudo crear el partido.')}
               </p>
             )}
@@ -292,7 +501,7 @@ export function MatchesPage() {
       >
         {matchesQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando partidos...</p>}
         {matchesQuery.isError && (
-          <p className="mt-3 text-sm text-red-600">No se pudieron cargar los partidos. Intenta nuevamente.</p>
+          <p className="mt-3 text-sm text-[var(--danger)]">No se pudieron cargar los partidos. Intenta nuevamente.</p>
         )}
         {matchesQuery.data && (
           <ResponsiveTable
@@ -303,17 +512,21 @@ export function MatchesPage() {
               { key: 'title', label: 'Titulo', render: (match) => match.title },
               { key: 'location', label: 'Ubicacion', render: (match) => match.location ?? '-' },
               { key: 'start', label: 'Inicio', render: (match) => toDateTimeLocalValue(match.startsAt).replace('T', ' ') },
-              { key: 'end', label: 'Fin', render: (match) => formatDateTime(match.endsAt) },
-              { key: 'status', label: 'Estado', render: (match) => match.status },
+              {
+                key: 'status',
+                label: 'Estado',
+                render: (match) => statusLabel(match),
+              },
               ...(isManager
                 ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }]
                 : []),
               {
-                key: 'attendance',
-                label: 'Confirmacion',
-                render: (match) => `${match.confirmedCount} confirmados / ${match.pendingCount} pendientes`,
+                key: 'roster',
+                label: 'Plantilla',
+                render: (match) =>
+                  `${match.confirmedCount} / ${match.targetPlayers ?? '-'}`,
               },
-              { key: 'source', label: 'Origen', render: (match) => match.sourceType },
+              { key: 'source', label: 'Origen', render: (match) => sourceTypeLabel(match.sourceType) },
               {
                 key: 'groups',
                 label: 'Grupos',
@@ -334,7 +547,7 @@ export function MatchesPage() {
                     {isManager && (
                       <button
                         className="ui-button-muted"
-                        onClick={() => cancelMutation.mutate(match.id)}
+                        onClick={() => handleCancelMatch(match)}
                         disabled={match.status === 'CANCELLED' || cancelMutation.isPending}
                       >
                         {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
@@ -358,8 +571,13 @@ export function MatchesPage() {
                 <p className="font-semibold">{match.title}</p>
                 <p className="ui-text-muted">Ubicacion: {match.location ?? '-'}</p>
                 <p className="ui-text-muted">Inicio: {toDateTimeLocalValue(match.startsAt).replace('T', ' ')}</p>
-                <p className="ui-text-muted">Fin: {formatDateTime(match.endsAt)}</p>
-                <p className="ui-text-muted">Confirmados: {match.confirmedCount} | Pendientes: {match.pendingCount}</p>
+                <p className="ui-text-muted">
+                  Plantilla: {match.confirmedCount} / {match.targetPlayers ?? '-'}
+                  {isMatchClosed(match) && match.status === 'SCHEDULED' ? ' (Cerrado)' : ''}
+                </p>
+                <p className="ui-text-muted">
+                  Origen: {sourceTypeLabel(match.sourceType)}
+                </p>
                 <p className="ui-text-muted">
                   Grupos objetivo: {match.targetGroupIds && match.targetGroupIds.length > 0 ? match.targetGroupIds.length : 'Todos'}
                 </p>
@@ -368,12 +586,12 @@ export function MatchesPage() {
                 )}
                 <div className="flex items-center justify-between gap-2">
                   <span className="ui-text-muted text-xs font-medium uppercase">
-                    {match.status} | {match.sourceType}
+                    {statusLabel(match)} | {sourceTypeLabel(match.sourceType)}
                   </span>
                   {isManager && (
                     <button
                       className="ui-button-muted"
-                      onClick={() => cancelMutation.mutate(match.id)}
+                      onClick={() => handleCancelMatch(match)}
                       disabled={match.status === 'CANCELLED' || cancelMutation.isPending}
                     >
                       {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
@@ -395,7 +613,7 @@ export function MatchesPage() {
           />
         )}
         {(cancelMutation.isError || exportConfirmedMutation.isError) && (
-          <p className="mt-3 text-sm text-red-600">
+          <p className="mt-3 text-sm text-[var(--danger)]">
             {getApiErrorMessage(
               cancelMutation.error ?? exportConfirmedMutation.error,
               'No se pudo completar la accion solicitada.',
@@ -413,25 +631,90 @@ export function MatchesPage() {
               : 'Partido seleccionado'
           }
         >
-          <div className="space-y-3">
-            <div className="ui-card p-3">
-              <p className="text-sm font-medium">Jugadores confirmados</p>
-              <div className="mt-2 space-y-1 text-sm">
-                {(confirmedQuery.data ?? []).map((player) => (
-                  <p key={player.userId} className="ui-text-muted">
-                    {player.fullName} - {player.playerHandle ?? player.email} ({player.primaryPosition ?? 'N/A'})
-                  </p>
-                ))}
-                {confirmedQuery.isLoading && <p className="ui-text-muted">Cargando confirmados...</p>}
-                {confirmedQuery.isError && <p className="text-sm text-red-600">No se pudieron cargar confirmados.</p>}
-                {confirmedQuery.data && confirmedQuery.data.length === 0 && (
-                  <p className="ui-text-muted">Aun no hay confirmados.</p>
+          <div className="space-y-5">
+            {rosterQuery.data && (
+              <>
+                <div className="ui-section-card">
+                  <div className="ui-section-header">
+                    <h3>Plantilla titular</h3>
+                    <p>{rosterQuery.data.roster.length} / {selectedMatch?.targetPlayers ?? '-'}</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    {rosterQuery.data.roster.map((p) => {
+                      const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                      return (
+                        <p key={key} className="ui-text-muted">
+                          {p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''} — {positionLabel(p.primaryPositionCode)}
+                          {p.guestPlayerId ? ' [Invitado]' : ''}
+                        </p>
+                      )
+                    })}
+                    {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted">Aun no hay titulares.</p>}
+                  </div>
+                </div>
+
+                {rosterQuery.data.waitlist.length > 0 && (
+                  <div className="ui-section-card">
+                    <div className="ui-section-header">
+                      <h3>Lista de espera</h3>
+                      <p>{rosterQuery.data.waitlist.length}</p>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      {rosterQuery.data.waitlist.map((p) => {
+                        const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                        return (
+                          <p key={key} className="ui-text-muted">
+                            {p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''} — {positionLabel(p.primaryPositionCode)}
+                            {p.guestPlayerId ? ' [Invitado]' : ''}
+                          </p>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
+
+                {rosterQuery.data.cancelled.length > 0 && (
+                  <div className="ui-section-card">
+                    <div className="ui-section-header">
+                      <h3>Cancelaron</h3>
+                      <p>{rosterQuery.data.cancelled.length}</p>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      {rosterQuery.data.cancelled.map((p) => {
+                        const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                        return <p key={key} className="ui-text-muted">{p.fullName}{p.guestPlayerId ? ' [Invitado]' : ''}</p>
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {!rosterQuery.data && confirmedQuery.data && (
+              <div className="ui-section-card">
+                <div className="ui-section-header">
+                  <h3>Jugadores confirmados</h3>
+                  <p>{confirmedQuery.data.length} / {selectedMatch?.targetPlayers ?? '-'}</p>
+                </div>
+                <div className="space-y-1 text-sm">
+                  {confirmedQuery.data.map((player) => {
+                    const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                    return (
+                      <p key={key} className="ui-text-muted">
+                        {player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' [Invitado]' : ''}
+                      </p>
+                    )
+                  })}
+                  {confirmedQuery.isLoading && <p className="ui-text-muted">Cargando confirmados...</p>}
+                  {confirmedQuery.isError && <p className="text-sm text-[var(--danger)]">No se pudieron cargar confirmados.</p>}
+                </div>
               </div>
-            </div>
+            )}
 
             {canManageTeams && (
-              <div className="ui-card p-3">
+              <div className="ui-section-card space-y-3">
+                <div className="ui-section-header">
+                  <h3>Armado de equipos</h3>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-sm">Tamano de equipo:</label>
                   <input
@@ -449,7 +732,7 @@ export function MatchesPage() {
                   </button>
                 </div>
                 {(suggestTeamsMutation.isError || saveTeamsMutation.isError) && (
-                  <p className="mt-2 text-sm text-red-600">
+                  <p className="text-sm text-[var(--danger)]">
                     {getApiErrorMessage(
                       suggestTeamsMutation.error ?? saveTeamsMutation.error,
                       'No se pudo completar la operacion de equipos.',
@@ -457,15 +740,18 @@ export function MatchesPage() {
                   </p>
                 )}
 
-                <div className="mt-3 space-y-3">
+                <div className="space-y-3">
                   <div className="ui-muted-surface rounded-lg p-3">
                     <p className="text-sm font-medium">Sin asignar ({unassignedPlayers.length})</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {unassignedPlayers.map((player) => (
-                        <span key={player.userId} className="rounded-md border px-2 py-1 text-xs">
-                          {player.fullName}
-                        </span>
-                      ))}
+                      {unassignedPlayers.map((player) => {
+                        const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                        return (
+                          <span key={key} className="rounded-md border px-2 py-1 text-xs">
+                            {player.fullName}{player.guestPlayerId ? ' (Inv.)' : ''}
+                          </span>
+                        )
+                      })}
                       {unassignedPlayers.length === 0 && <span className="ui-text-muted text-xs">Todos los jugadores estan asignados.</span>}
                     </div>
                   </div>
@@ -487,16 +773,26 @@ export function MatchesPage() {
                         />
                       </div>
                       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                        {(confirmedQuery.data ?? []).map((player) => (
-                          <label key={player.userId} className="inline-flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={team.playerIds.includes(player.userId)}
-                              onChange={() => toggleDraftPlayer(team.teamNumber, player.userId)}
-                            />
-                            <span>{player.fullName} ({player.playerHandle ?? player.email})</span>
-                          </label>
-                        ))}
+                        {(confirmedQuery.data ?? []).map((player) => {
+                          const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                          const isGuest = Boolean(player.guestPlayerId)
+                          const playerId = isGuest ? player.guestPlayerId : player.userId
+                          const isInTeam = isGuest
+                            ? team.guestPlayerIds.includes(playerId!)
+                            : team.playerIds.includes(playerId!)
+                          return (
+                            <label key={key} className="inline-flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={isInTeam}
+                                onChange={() => toggleDraftPlayer(team.teamNumber, playerId!, isGuest)}
+                              />
+                              <span>
+                                {player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{isGuest ? ' [Inv.]' : ''}
+                              </span>
+                            </label>
+                          )
+                        })}
                       </div>
                     </div>
                   ))}

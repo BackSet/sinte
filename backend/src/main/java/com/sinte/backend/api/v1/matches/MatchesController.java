@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -44,11 +45,10 @@ public class MatchesController {
     public ResponseEntity<MatchResponse> create(@Valid @RequestBody MatchUpsertRequest request) {
         CreateMatchRequest createRequest = new CreateMatchRequest(
                 SecurityUtils.currentUserId(),
+                request.configId(),
                 request.title(),
                 request.description(),
-                request.location(),
                 request.startsAt(),
-                request.endsAt(),
                 request.targetGroupIds()
         );
         Match match = matchService.createManualMatch(createRequest);
@@ -62,6 +62,7 @@ public class MatchesController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
             @RequestParam(required = false) MatchStatus status
     ) {
+        matchService.closeStaleMatches();
         List<MatchResponse> matches = matchService.listMatchesForUser(SecurityUtils.currentUserId(), from, to, status).stream()
                 .map(this::toResponse)
                 .toList();
@@ -73,11 +74,10 @@ public class MatchesController {
     public ResponseEntity<MatchResponse> update(@PathVariable UUID matchId, @Valid @RequestBody MatchUpsertRequest request) {
         CreateMatchRequest updateRequest = new CreateMatchRequest(
                 SecurityUtils.currentUserId(),
+                request.configId(),
                 request.title(),
                 request.description(),
-                request.location(),
                 request.startsAt(),
-                request.endsAt(),
                 request.targetGroupIds()
         );
         Match match = matchService.updateManualMatch(matchId, updateRequest);
@@ -93,18 +93,37 @@ public class MatchesController {
 
     @GetMapping("/{matchId}/confirmed")
     @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
-    public ResponseEntity<List<ConfirmedPlayerResponse>> confirmedPlayers(@PathVariable UUID matchId) {
+    public ResponseEntity<ConfirmedPlayersResponse> confirmedPlayers(@PathVariable UUID matchId) {
         UUID userId = SecurityUtils.currentUserId();
-        List<ConfirmedPlayerResponse> players = matchService.listConfirmedPlayers(userId, matchId).stream()
+        List<ConfirmedPlayerResponse> users = matchService.listConfirmedPlayers(userId, matchId).stream()
                 .map(player -> new ConfirmedPlayerResponse(
                         player.userId(),
+                        null,
                         player.fullName(),
                         player.email(),
-                        player.playerHandle(),
-                        player.primaryPosition()
+                        player.playerHandle()
                 ))
                 .toList();
-        return ResponseEntity.ok(players);
+        List<ConfirmedPlayerResponse> guests = matchService.listConfirmedGuests(userId, matchId).stream()
+                .map(player -> new ConfirmedPlayerResponse(
+                        null,
+                        player.guestPlayerId(),
+                        player.fullName(),
+                        null,
+                        null
+                ))
+                .toList();
+        List<ConfirmedPlayerResponse> all = new ArrayList<>(users);
+        all.addAll(guests);
+        return ResponseEntity.ok(new ConfirmedPlayersResponse(all));
+    }
+
+    @GetMapping("/{matchId}/roster")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
+    public ResponseEntity<RosterResponse> roster(@PathVariable UUID matchId) {
+        UUID userId = SecurityUtils.currentUserId();
+        MatchService.RosterView roster = matchService.getRoster(userId, matchId);
+        return ResponseEntity.ok(toRosterResponse(roster));
     }
 
     @GetMapping("/{matchId}/teams")
@@ -141,7 +160,8 @@ public class MatchesController {
                 .map(team -> new MatchService.TeamAssignment(
                         team.teamNumber(),
                         team.name(),
-                        team.playerIds()
+                        team.playerIds(),
+                        team.guestPlayerIds()
                 ))
                 .toList();
         List<TeamResponse> teams = matchService.saveTeams(userId, matchId, assignments).stream()
@@ -176,6 +196,7 @@ public class MatchesController {
                 match.getEndsAt(),
                 match.getStatus().name(),
                 match.getSourceType().name(),
+                match.getConfig() != null ? match.getConfig().getId() : null,
                 match.getSeries() != null ? match.getSeries().getId() : null,
                 match.getCreatedAt(),
                 matchService.getTargetGroupIds(match.getId()),
@@ -195,20 +216,40 @@ public class MatchesController {
                 team.players().stream()
                         .map(player -> new TeamPlayerResponse(
                                 player.userId(),
+                                player.guestPlayerId(),
                                 player.fullName(),
                                 player.playerHandle(),
-                                player.primaryPosition()
+                                player.primaryPositionCode()
                         ))
                         .toList()
+        );
+    }
+
+    private RosterResponse toRosterResponse(MatchService.RosterView roster) {
+        return new RosterResponse(
+                roster.roster().stream().map(this::toRosterPlayerResponse).toList(),
+                roster.waitlist().stream().map(this::toRosterPlayerResponse).toList(),
+                roster.cancelled().stream().map(this::toRosterPlayerResponse).toList()
+        );
+    }
+
+    private RosterPlayerResponse toRosterPlayerResponse(MatchService.RosterPlayerEntry entry) {
+        return new RosterPlayerResponse(
+                entry.userId(),
+                entry.guestPlayerId(),
+                entry.fullName(),
+                entry.email(),
+                entry.playerHandle(),
+                entry.primaryPositionCode(),
+                entry.respondedAt()
         );
     }
 
     public record MatchUpsertRequest(
             @NotBlank String title,
             String description,
-            String location,
+            @NotNull UUID configId,
             @NotNull OffsetDateTime startsAt,
-            @NotNull OffsetDateTime endsAt,
             List<UUID> targetGroupIds
     ) {
     }
@@ -224,6 +265,7 @@ public class MatchesController {
             OffsetDateTime endsAt,
             String status,
             String sourceType,
+            UUID configId,
             UUID seriesId,
             OffsetDateTime createdAt,
             List<UUID> targetGroupIds,
@@ -242,10 +284,15 @@ public class MatchesController {
 
     public record ConfirmedPlayerResponse(
             UUID userId,
+            UUID guestPlayerId,
             String fullName,
             String email,
-            String playerHandle,
-            String primaryPosition
+            String playerHandle
+    ) {
+    }
+
+    public record ConfirmedPlayersResponse(
+            List<ConfirmedPlayerResponse> players
     ) {
     }
 
@@ -255,7 +302,8 @@ public class MatchesController {
     public record TeamInput(
             @NotNull Integer teamNumber,
             String name,
-            List<UUID> playerIds
+            List<UUID> playerIds,
+            List<UUID> guestPlayerIds
     ) {
     }
 
@@ -268,9 +316,28 @@ public class MatchesController {
 
     public record TeamPlayerResponse(
             UUID userId,
+            UUID guestPlayerId,
             String fullName,
             String playerHandle,
-            String primaryPosition
+            String primaryPositionCode
+    ) {
+    }
+
+    public record RosterResponse(
+            List<RosterPlayerResponse> roster,
+            List<RosterPlayerResponse> waitlist,
+            List<RosterPlayerResponse> cancelled
+    ) {
+    }
+
+    public record RosterPlayerResponse(
+            UUID userId,
+            UUID guestPlayerId,
+            String fullName,
+            String email,
+            String playerHandle,
+            String primaryPositionCode,
+            OffsetDateTime respondedAt
     ) {
     }
 }

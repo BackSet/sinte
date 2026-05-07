@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Icon } from './Icon'
 
 type ResponsiveColumn<T> = {
   key: string
@@ -23,7 +24,12 @@ export function ResponsiveTable<T>({
   renderMobileCard,
 }: ResponsiveTableProps<T>) {
   if (!data.length) {
-    return <p className="ui-text-muted text-sm" role="status">{emptyMessage}</p>
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <Icon name="search" size="lg" className="ui-text-muted mb-2" />
+        <p className="ui-text-muted text-sm">{emptyMessage}</p>
+      </div>
+    )
   }
 
   return (
@@ -40,9 +46,9 @@ export function ResponsiveTable<T>({
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Tabla de resultados</caption>
           <thead>
-            <tr className="border-b text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border-soft)] text-[var(--text-secondary)]">
               {columns.map((column) => (
-                <th key={column.key} scope="col" className={`py-2 ${column.className ?? ''}`}>
+                <th key={column.key} scope="col" className={`py-2.5 pr-4 font-medium ${column.className ?? ''}`}>
                   {column.label}
                 </th>
               ))}
@@ -50,9 +56,9 @@ export function ResponsiveTable<T>({
           </thead>
           <tbody>
             {data.map((item) => (
-              <tr key={rowKey(item)} className="border-b align-top">
+              <tr key={rowKey(item)} className="border-b border-[var(--border-soft)] align-top transition-colors hover:bg-[var(--bg-hover)]">
                 {columns.map((column) => (
-                  <td key={column.key} className={`py-2 ${column.className ?? ''}`}>
+                  <td key={column.key} className={`py-2.5 pr-4 ${column.className ?? ''}`}>
                     {column.render(item)}
                   </td>
                 ))}

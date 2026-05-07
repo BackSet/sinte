@@ -25,8 +25,8 @@ public class MatchSeries {
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
 
-    @Column(nullable = false, length = 120)
-    private String name;
+    @Column(name = "name", nullable = false, length = 120)
+    private String defaultTitle;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -37,11 +37,9 @@ public class MatchSeries {
     @Column(nullable = false, length = 60)
     private String timezone;
 
-    @Column(length = 180)
-    private String location;
-
-    @Column(name = "target_players")
-    private Integer targetPlayers;
+    @ManyToOne
+    @JoinColumn(name = "config_id")
+    private MatchConfig config;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -54,20 +52,18 @@ public class MatchSeries {
 
     public MatchSeries(
             User createdBy,
-            String name,
+            String defaultTitle,
             LocalDate startDate,
             LocalDate endDate,
             String timezone,
-            String location,
-            Integer targetPlayers
+            MatchConfig config
     ) {
         this.createdBy = createdBy;
-        this.name = name;
+        this.defaultTitle = defaultTitle;
         this.startDate = startDate;
         this.endDate = endDate;
         this.timezone = timezone;
-        this.location = location;
-        this.targetPlayers = targetPlayers;
+        this.config = config;
     }
 
     @PrePersist
@@ -79,8 +75,8 @@ public class MatchSeries {
         return id;
     }
 
-    public String getName() {
-        return name;
+    public String getDefaultTitle() {
+        return defaultTitle;
     }
 
     public User getCreatedBy() {
@@ -99,12 +95,8 @@ public class MatchSeries {
         return timezone;
     }
 
-    public String getLocation() {
-        return location;
-    }
-
-    public Integer getTargetPlayers() {
-        return targetPlayers;
+    public MatchConfig getConfig() {
+        return config;
     }
 
     public boolean isActive() {
@@ -115,7 +107,22 @@ public class MatchSeries {
         return createdAt;
     }
 
-    public void deactivate() {
+    public void deactivate(LocalDate endDate) {
         this.active = false;
+        this.endDate = endDate;
+    }
+
+    public void activate() {
+        this.active = true;
+        this.endDate = null;
+    }
+
+    public void updateMetadata(String defaultTitle, String timezone) {
+        this.defaultTitle = defaultTitle;
+        this.timezone = timezone;
+    }
+
+    public void setConfig(MatchConfig config) {
+        this.config = config;
     }
 }

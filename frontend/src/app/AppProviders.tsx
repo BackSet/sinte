@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { getMe } from '../features/auth/auth-api'
 import { useAuthStore } from '../store/auth-store'
 import { useThemeStore } from '../store/theme-store'
+import { ToastContainer } from '../components/ui/Toast'
 
 const queryClient = new QueryClient()
 
@@ -44,5 +45,10 @@ export function AppProviders({ children }: PropsWithChildren) {
       .catch(() => clearAuth())
   }, [accessToken, refreshToken, setSession, clearAuth])
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <ToastContainer />
+    </QueryClientProvider>
+  )
 }

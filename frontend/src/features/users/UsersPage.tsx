@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '../../lib/api-client'
+import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
-import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
-import type { PlayerPosition } from '../../lib/player-positions'
-import { getApiErrorMessage } from '../../lib/api-client'
+import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { useToastStore } from '../../store/toast-store'
 
 type UserItem = {
   id: string
@@ -16,20 +15,18 @@ type UserItem = {
   nickname?: string
   nicknameTag?: string
   playerHandle?: string
-  primaryPosition?: PlayerPosition
-  secondaryPosition?: PlayerPosition
   active: boolean
   roles: string[]
 }
 
 export function UsersPage() {
   const queryClient = useQueryClient()
+  const addToast = useToastStore((s) => s.addToast)
+  const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
-  const [primaryPosition, setPrimaryPosition] = useState<PlayerPosition>('CENTRAL_MIDFIELDER')
-  const [secondaryPosition, setSecondaryPosition] = useState<string>('')
   const [password, setPassword] = useState('')
 
   const usersQuery = useQuery({
@@ -46,9 +43,7 @@ export function UsersPage() {
         fullName,
         email,
         phone,
-        nickname,
-        primaryPosition,
-        secondaryPosition: secondaryPosition ? (secondaryPosition as PlayerPosition) : undefined,
+        nickname: nickname || undefined,
         password,
         initialRole: 'PLAYER',
       })
@@ -58,10 +53,12 @@ export function UsersPage() {
       setEmail('')
       setPhone('')
       setNickname('')
-      setPrimaryPosition('CENTRAL_MIDFIELDER')
-      setSecondaryPosition('')
       setPassword('')
+      addToast('success', 'Usuario creado correctamente')
       queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (error) => {
+      addToast('error', getApiErrorMessage(error, 'No se pudo crear el usuario'))
     },
   })
 
@@ -69,7 +66,13 @@ export function UsersPage() {
     mutationFn: async ({ userId, active }: { userId: string; active: boolean }) => {
       await apiClient.patch(`/api/v1/users/${userId}/active?value=${!active}`)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      addToast('success', 'Estado del usuario actualizado')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (error) => {
+      addToast('error', getApiErrorMessage(error, 'No se pudo cambiar el estado del usuario'))
+    },
   })
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -77,35 +80,36 @@ export function UsersPage() {
     createMutation.mutate()
   }
 
+  const handleToggleActive = async (user: UserItem) => {
+    const confirmed = await requestConfirm({
+      title: user.active ? 'Desactivar usuario' : 'Activar usuario',
+      description: user.active
+        ? `Seguro que deseas desactivar a ${user.fullName}? No podra iniciar sesion.`
+        : `Seguro que deseas reactivar a ${user.fullName}?`,
+      confirmLabel: user.active ? 'Desactivar' : 'Activar',
+      variant: user.active ? 'danger' : 'default',
+    })
+    if (confirmed) {
+      toggleMutation.mutate({ userId: user.id, active: user.active })
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {ConfirmDialogComponent}
+
       <ResponsiveSection title="Crear usuario" description="Alta rapida de jugadores y staff">
         <form className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={onSubmit}>
           <input className="ui-input" aria-label="Nombre completo" placeholder="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           <input className="ui-input" aria-label="Correo" placeholder="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <input className="ui-input" aria-label="Telefono" placeholder="Telefono" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <input className="ui-input" aria-label="Apodo" placeholder="Apodo (opcional)" value={nickname} onChange={(e) => setNickname(e.target.value)} />
-          <select className="ui-input" aria-label="Posicion principal" value={primaryPosition} onChange={(e) => setPrimaryPosition(e.target.value as PlayerPosition)} required>
-            {PLAYER_POSITION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select className="ui-input" aria-label="Posicion secundaria" value={secondaryPosition} onChange={(e) => setSecondaryPosition(e.target.value)}>
-            <option value="">Sin secundaria</option>
-            {PLAYER_POSITION_OPTIONS.filter((option) => option.value !== primaryPosition).map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <input className="ui-input md:col-span-2" placeholder="Contrasena temporal" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           <button className="ui-button md:col-span-2" type="submit" disabled={createMutation.isPending}>
             {createMutation.isPending ? 'Guardando...' : 'Guardar usuario'}
           </button>
           {createMutation.isError && (
-            <p className="md:col-span-2 text-sm text-red-600">
+            <p className="md:col-span-2 text-sm text-[var(--danger)]">
               {getApiErrorMessage(createMutation.error, 'No se pudo crear el usuario.')}
             </p>
           )}
@@ -114,20 +118,29 @@ export function UsersPage() {
 
       <ResponsiveSection title="Listado de usuarios">
         {usersQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando usuarios...</p>}
-        {usersQuery.isError && <p className="mt-3 text-sm text-red-600">No se pudo cargar el listado de usuarios.</p>}
+        {usersQuery.isError && <p className="mt-3 text-sm text-[var(--danger)]">No se pudo cargar el listado de usuarios.</p>}
         {usersQuery.data && (
           <ResponsiveTable
             data={usersQuery.data}
             rowKey={(user) => user.id}
             emptyMessage="Sin usuarios registrados."
             columns={[
-              { key: 'name', label: 'Nombre', render: (user) => user.fullName },
-              { key: 'email', label: 'Correo', render: (user) => user.email },
+              { key: 'name', label: 'Nombre', render: (user) => (
+                <div>
+                  <p className="font-medium">{user.fullName}</p>
+                  <p className="ui-text-muted text-xs">{user.email}</p>
+                </div>
+              )},
               { key: 'phone', label: 'Telefono', render: (user) => user.phone },
-              { key: 'handle', label: 'Codigo jugador', render: (user) => user.playerHandle ?? '-' },
-              { key: 'position', label: 'Posiciones', render: (user) => `${user.primaryPosition ?? '-'} / ${user.secondaryPosition ?? '-'}` },
+              { key: 'handle', label: 'Codigo', render: (user) => (
+                <span className="ui-badge">{user.playerHandle ?? '-'}</span>
+              )},
               { key: 'roles', label: 'Roles', render: (user) => user.roles.join(', ') || '-' },
-              { key: 'status', label: 'Estado', render: (user) => (user.active ? 'Activo' : 'Inactivo') },
+              { key: 'status', label: 'Estado', render: (user) => (
+                <span className={`ui-badge ${user.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
+                  {user.active ? 'Activo' : 'Inactivo'}
+                </span>
+              )},
               {
                 key: 'actions',
                 label: '',
@@ -135,7 +148,7 @@ export function UsersPage() {
                 render: (user) => (
                   <button
                     className="ui-button-muted"
-                    onClick={() => toggleMutation.mutate({ userId: user.id, active: user.active })}
+                    onClick={() => handleToggleActive(user)}
                   >
                     Cambiar estado
                   </button>
@@ -144,23 +157,22 @@ export function UsersPage() {
             ]}
             renderMobileCard={(user) => (
               <div className="space-y-2 text-sm">
-                <p className="font-semibold">{user.fullName}</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold">{user.fullName}</p>
+                  <span className={`ui-badge ${user.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
+                    {user.active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
                 <p className="ui-text-muted">{user.email}</p>
                 <p className="ui-text-muted">Telefono: {user.phone}</p>
                 <p className="ui-text-muted">Codigo: {user.playerHandle ?? '-'}</p>
-                <p className="ui-text-muted">Posiciones: {user.primaryPosition ?? '-'} / {user.secondaryPosition ?? '-'}</p>
                 <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <span className="ui-text-muted text-xs font-medium uppercase">
-                    {user.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                  <button
-                    className="ui-button-muted"
-                    onClick={() => toggleMutation.mutate({ userId: user.id, active: user.active })}
-                  >
-                    Cambiar estado
-                  </button>
-                </div>
+                <button
+                  className="ui-button-muted"
+                  onClick={() => handleToggleActive(user)}
+                >
+                  Cambiar estado
+                </button>
               </div>
             )}
           />

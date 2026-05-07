@@ -81,7 +81,7 @@ class GroupMatchTargetingIntegrationTest {
                 "Solo para titulares",
                 "Cancha Norte",
                 OffsetDateTime.now().plusDays(1),
-                OffsetDateTime.now().plusDays(1).plusHours(2),
+                14,
                 List.of(group.getId())
         ));
 

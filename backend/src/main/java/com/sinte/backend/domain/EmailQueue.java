@@ -8,8 +8,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -22,10 +20,6 @@ public class EmailQueue {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
-    @ManyToOne
-    @JoinColumn(name = "notification_id")
-    private Notification notification;
 
     @Column(name = "to_email", nullable = false, length = 180)
     private String toEmail;
@@ -58,8 +52,7 @@ public class EmailQueue {
     protected EmailQueue() {
     }
 
-    public EmailQueue(Notification notification, String toEmail, String subject, String bodyHtml) {
-        this.notification = notification;
+    public EmailQueue(String toEmail, String subject, String bodyHtml) {
         this.toEmail = toEmail;
         this.subject = subject;
         this.bodyHtml = bodyHtml;

@@ -23,17 +23,15 @@ public class MatchExportService {
             header.createCell(0).setCellValue("Nombre");
             header.createCell(1).setCellValue("Email");
             header.createCell(2).setCellValue("Codigo");
-            header.createCell(3).setCellValue("Posicion principal");
 
             for (MatchService.ConfirmedPlayer player : players) {
                 Row row = sheet.createRow(rowIndex++);
                 row.createCell(0).setCellValue(player.fullName());
                 row.createCell(1).setCellValue(player.email());
                 row.createCell(2).setCellValue(player.playerHandle() != null ? player.playerHandle() : "");
-                row.createCell(3).setCellValue(player.primaryPosition() != null ? player.primaryPosition() : "");
             }
 
-            for (int cell = 0; cell < 4; cell++) {
+            for (int cell = 0; cell < 3; cell++) {
                 sheet.autoSizeColumn(cell);
             }
 
