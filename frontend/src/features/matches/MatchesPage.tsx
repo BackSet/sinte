@@ -116,6 +116,17 @@ type TeamDraft = {
   guestPlayerIds: string[]
 }
 
+type GuestPlayerItem = {
+  id: string
+  matchId: string
+  createdByUserId: string
+  fullName: string
+  status: string
+  respondedAt: string | null
+  createdAt: string
+  positions: Array<{ positionCode: string; priority: number }>
+}
+
 function toDateTimeLocalValue(value: string): string {
   const date = new Date(value)
   const iso = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString()
@@ -163,10 +174,18 @@ export function MatchesPage() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SCHEDULED' | 'CANCELLED'>('ALL')
   const [teamSize, setTeamSize] = useState(2)
   const [draftTeams, setDraftTeams] = useState<TeamDraft[]>([])
+  const [guestFullName, setGuestFullName] = useState('')
+  const [guestPositionCodes, setGuestPositionCodes] = useState<string[]>([])
 
   const matchesQuery = useQuery({
     queryKey: ['matches'],
     queryFn: async () => (await apiClient.get<MatchItem[]>('/api/v1/matches')).data,
+  })
+
+  const guestsQuery = useQuery({
+    queryKey: ['match-guests', selectedMatchId],
+    queryFn: async () => (await apiClient.get<GuestPlayerItem[]>(`/api/v1/matches/${selectedMatchId}/guest-players`)).data,
+    enabled: Boolean(selectedMatchId) && isManager,
   })
 
   const confirmedQuery = useQuery({
@@ -281,6 +300,55 @@ export function MatchesPage() {
       window.URL.revokeObjectURL(url)
     },
   })
+
+  const createGuestMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.post(`/api/v1/matches/${selectedMatchId}/guest-players`, {
+        fullName: guestFullName.trim(),
+        positionCodes: guestPositionCodes.length > 0 ? guestPositionCodes : undefined,
+      })
+    },
+    onSuccess: () => {
+      setGuestFullName('')
+      setGuestPositionCodes([])
+      addToast('success', 'Invitado agregado')
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo agregar invitado')),
+  })
+
+  const updateGuestStatusMutation = useMutation({
+    mutationFn: async ({ guestId, status }: { guestId: string; status: string }) => {
+      await apiClient.put(`/api/v1/matches/${selectedMatchId}/guest-players/${guestId}/attendance`, { status })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo actualizar invitado')),
+  })
+
+  const deleteGuestMutation = useMutation({
+    mutationFn: async (guestId: string) => {
+      await apiClient.delete(`/api/v1/matches/${selectedMatchId}/guest-players/${guestId}`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Invitado eliminado')
+      queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatchId] })
+      queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatchId] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar invitado')),
+  })
+
+  const toggleGuestPosition = (code: string) => {
+    setGuestPositionCodes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    )
+  }
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -797,6 +865,141 @@ export function MatchesPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {isManager && selectedMatchId && (
+              <div className="ui-section-card space-y-3">
+                <div className="ui-section-header">
+                  <h3>Invitados</h3>
+                  <p>{guestsQuery.data?.length ?? 0}</p>
+                </div>
+                <form
+                  className="flex flex-wrap items-end gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (guestFullName.trim()) createGuestMutation.mutate()
+                  }}
+                >
+                  <div className="min-w-48 flex-1">
+                    <label className="ui-text-muted mb-1 block text-xs">Nombre del invitado</label>
+                    <input
+                      className="ui-input"
+                      placeholder="Nombre completo"
+                      value={guestFullName}
+                      onChange={(e) => setGuestFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="ui-text-muted mb-1 block text-xs">Posiciones (opcional)</label>
+                    <div className="flex flex-wrap gap-1">
+                      {PLAYER_POSITION_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`rounded-md border px-2 py-1 text-xs ${
+                            guestPositionCodes.includes(opt.value)
+                              ? 'border-[var(--primary)] bg-[var(--primary)] text-white'
+                              : 'border-[var(--border)]'
+                          }`}
+                          onClick={() => toggleGuestPosition(opt.value)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button className="ui-button" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
+                    {createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}
+                  </button>
+                </form>
+                {createGuestMutation.isError && (
+                  <p className="text-sm text-[var(--danger)]">{getApiErrorMessage(createGuestMutation.error, 'No se pudo agregar invitado.')}</p>
+                )}
+                {guestsQuery.isLoading && <p className="ui-text-muted text-sm">Cargando invitados...</p>}
+                {guestsQuery.data && guestsQuery.data.length > 0 && (
+                  <div className="space-y-2 text-sm">
+                    {guestsQuery.data.map((guest) => (
+                      <div key={guest.id} className="ui-muted-surface flex items-center justify-between rounded-lg px-3 py-2">
+                        <div>
+                          <p className="font-medium">{guest.fullName}</p>
+                          <p className="ui-text-muted text-xs">
+                            {guest.positions.length > 0
+                              ? guest.positions.map((p) => positionLabel(p.positionCode)).join(', ')
+                              : 'Sin posicion'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {guest.status === 'PENDING' && (
+                            <>
+                              <button
+                                className="ui-button text-xs"
+                                onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })}
+                                disabled={updateGuestStatusMutation.isPending}
+                              >
+                                Confirmar
+                              </button>
+                              <button
+                                className="ui-button-muted text-xs"
+                                onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'NO' })}
+                                disabled={updateGuestStatusMutation.isPending}
+                              >
+                                Declinar
+                              </button>
+                            </>
+                          )}
+                          {guest.status === 'YES' && (
+                            <button
+                              className="ui-button-muted text-xs"
+                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'CANCELLED' })}
+                              disabled={updateGuestStatusMutation.isPending}
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                          {guest.status === 'CANCELLED' && (
+                            <button
+                              className="ui-button-muted text-xs"
+                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })}
+                              disabled={updateGuestStatusMutation.isPending}
+                            >
+                              Reactivar
+                            </button>
+                          )}
+                          {guest.status === 'NO' && (
+                            <button
+                              className="ui-button-muted text-xs"
+                              onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'PENDING' })}
+                              disabled={updateGuestStatusMutation.isPending}
+                            >
+                              Pendiente
+                            </button>
+                          )}
+                          <span className={`ui-badge ${
+                            guest.status === 'YES' ? 'ui-badge-success' :
+                            guest.status === 'NO' ? 'ui-badge-danger' :
+                            guest.status === 'CANCELLED' ? 'ui-badge-muted' : 'ui-badge-muted'
+                          }`}>
+                            {guest.status === 'YES' ? 'Confirmado' :
+                             guest.status === 'NO' ? 'No asistira' :
+                             guest.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente'}
+                          </span>
+                          <button
+                            className="text-xs text-[var(--danger)] hover:underline"
+                            onClick={() => deleteGuestMutation.mutate(guest.id)}
+                            disabled={deleteGuestMutation.isPending}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {guestsQuery.data && guestsQuery.data.length === 0 && (
+                  <p className="ui-text-muted text-sm">No hay invitados agregados a este partido.</p>
+                )}
               </div>
             )}
           </div>

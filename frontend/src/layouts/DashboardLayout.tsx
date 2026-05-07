@@ -25,6 +25,7 @@ export function DashboardLayout() {
   const managementLinks = [
     ...(canManage ? [{ to: '/matches', label: 'Partidos', icon: 'matches' as const }] : []),
     ...(canManage ? [{ to: '/series', label: 'Series', icon: 'series' as const }] : []),
+    ...(canManage ? [{ to: '/configs', label: 'Configuraciones', icon: 'configs' as const }] : []),
     ...(canManage ? [{ to: '/groups', label: 'Grupos', icon: 'groups' as const }] : []),
     ...(isAdmin ? [{ to: '/users', label: 'Usuarios', icon: 'users' as const }] : []),
     ...(isAdmin ? [{ to: '/roles', label: 'Roles', icon: 'roles' as const }] : []),

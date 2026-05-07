@@ -15,6 +15,7 @@ import { NotificationsPage } from '../features/notifications/NotificationsPage'
 import { AdminEmailQueuePage } from '../features/admin/AdminEmailQueuePage'
 import { GroupsPage } from '../features/groups/GroupsPage'
 import { MyGroupsPage } from '../features/groups/MyGroupsPage'
+import { ConfigsPage } from '../features/configs/ConfigsPage'
 
 const router = createBrowserRouter([
   {
@@ -46,6 +47,7 @@ const router = createBrowserRouter([
             children: [
               { path: '/series', element: <SeriesPage /> },
               { path: '/groups', element: <GroupsPage /> },
+              { path: '/configs', element: <ConfigsPage /> },
             ],
           },
           { path: '/attendance', element: <AttendancePage /> },
