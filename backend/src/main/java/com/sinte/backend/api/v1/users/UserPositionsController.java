@@ -1,6 +1,5 @@
 package com.sinte.backend.api.v1.users;
 
-import com.sinte.backend.service.DomainException;
 import com.sinte.backend.service.UserPositionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;

@@ -1,6 +1,7 @@
 package com.sinte.backend.service;
 
 import com.sinte.backend.domain.Match;
+import com.sinte.backend.domain.MatchAttendance;
 import com.sinte.backend.domain.MatchConfig;
 import com.sinte.backend.config.SeriesGenerationProperties;
 import com.sinte.backend.domain.GuestPlayer;
@@ -35,7 +36,6 @@ import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.repository.GuestPlayerRepository;
 import com.sinte.backend.repository.GuestPlayerPositionRepository;
-import com.sinte.backend.repository.PositionRepository;
 import com.sinte.backend.service.dto.CreateMatchRequest;
 import com.sinte.backend.service.dto.CreateMatchSeriesRequest;
 import com.sinte.backend.service.dto.SeriesRuleRequest;
@@ -72,7 +72,6 @@ public class MatchService {
     private final UserPositionRepository userPositionRepository;
     private final GuestPlayerRepository guestPlayerRepository;
     private final GuestPlayerPositionRepository guestPlayerPositionRepository;
-    private final PositionRepository positionRepository;
     private final AttendanceService attendanceService;
     private final NotificationService notificationService;
     private final GroupService groupService;
@@ -94,7 +93,6 @@ public class MatchService {
             UserPositionRepository userPositionRepository,
             GuestPlayerRepository guestPlayerRepository,
             GuestPlayerPositionRepository guestPlayerPositionRepository,
-            PositionRepository positionRepository,
             AttendanceService attendanceService,
             NotificationService notificationService,
             GroupService groupService,
@@ -115,7 +113,6 @@ public class MatchService {
         this.userPositionRepository = userPositionRepository;
         this.guestPlayerRepository = guestPlayerRepository;
         this.guestPlayerPositionRepository = guestPlayerPositionRepository;
-        this.positionRepository = positionRepository;
         this.attendanceService = attendanceService;
         this.notificationService = notificationService;
         this.groupService = groupService;

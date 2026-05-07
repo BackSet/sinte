@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sinte.backend.api.v1.auth.dto.AuthResponse;
 import com.sinte.backend.api.v1.auth.dto.LoginRequest;
 import com.sinte.backend.api.v1.auth.dto.RegisterRequest;
-import com.sinte.backend.domain.enums.PlayerPosition;
 import com.sinte.backend.service.AuthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,8 +25,6 @@ class AuthServiceHandleIntegrationTest {
                 "jugador1@test.com",
                 "0991111111",
                 "backset",
-                PlayerPosition.STRIKER,
-                PlayerPosition.LEFT_WINGER,
                 "Secret123!"
         ));
 

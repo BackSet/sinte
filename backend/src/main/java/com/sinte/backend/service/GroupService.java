@@ -88,7 +88,6 @@ public class GroupService {
     @Transactional
     public SinteGroupMember addMemberByHandle(UUID requesterUserId, UUID groupId, String handle) {
         SinteGroup group = requireGroupForRequester(requesterUserId, groupId, true);
-        User requester = requireUser(requesterUserId);
         UserHandleService.HandleParts handleParts = userHandleService.parseHandle(handle);
         User user = userRepository.findByNicknameAndNicknameTag(handleParts.nickname(), handleParts.tag())
                 .orElseThrow(() -> new DomainException("No existe un jugador con ese codigo"));

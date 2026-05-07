@@ -1,6 +1,5 @@
 package com.sinte.backend.service;
 
-import com.sinte.backend.domain.Position;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.UserPosition;
 import com.sinte.backend.repository.PositionRepository;
