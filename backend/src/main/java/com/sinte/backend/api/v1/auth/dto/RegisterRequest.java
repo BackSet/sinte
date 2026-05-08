@@ -10,7 +10,7 @@ public record RegisterRequest(
         @NotBlank @Email @Size(max = 180) String email,
         @NotBlank @Size(max = 30) String phone,
         @Size(max = 80) String nickname,
-        @Size(max = 10) String tag,
+        @NotBlank @Size(min = 4, max = 10) String tag,
         @NotBlank @Size(min = 8, max = 120) String password,
         List<PositionRequest> positions
 ) {

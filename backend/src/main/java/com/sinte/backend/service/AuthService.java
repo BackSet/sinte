@@ -77,9 +77,6 @@ public class AuthService {
         }
 
         String tag = request.tag();
-        if (tag != null && (tag.length() < 4 || tag.length() > 10)) {
-            throw new DomainException("El tag debe tener entre 4 y 10 caracteres");
-        }
 
         User user = new User(
                 request.fullName(),

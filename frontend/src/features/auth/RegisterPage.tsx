@@ -60,7 +60,7 @@ export function RegisterPage() {
       email,
       phone,
       nickname: nickname || undefined,
-      tag: tag || undefined,
+      tag,
       password,
       positions: selectedPositions.length > 0 ? selectedPositions : undefined,
     })
@@ -114,7 +114,7 @@ export function RegisterPage() {
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium" htmlFor="register-tag">Tag (4-10 caracteres, opcional)</label>
+          <label className="mb-1.5 block text-sm font-medium" htmlFor="register-tag">Tag (4-10 caracteres)</label>
           <input
             id="register-tag"
             className="ui-input"
@@ -122,6 +122,7 @@ export function RegisterPage() {
             onChange={(e) => setTag(e.target.value.toUpperCase())}
             maxLength={10}
             placeholder="Ej: MITEAM123"
+            required
           />
         </div>
         <div className="md:col-span-2">
