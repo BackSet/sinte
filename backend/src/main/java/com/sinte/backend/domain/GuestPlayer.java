@@ -30,6 +30,12 @@ public class GuestPlayer {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
+    @Column(nullable = false, length = 80)
+    private String nickname = "";
+
+    @Column(name = "shirt_number")
+    private Integer shirtNumber;
+
     @Column(nullable = false, length = 20)
     private String status = "PENDING";
 
@@ -45,10 +51,11 @@ public class GuestPlayer {
     protected GuestPlayer() {
     }
 
-    public GuestPlayer(Match match, User createdBy, String fullName) {
+    public GuestPlayer(Match match, User createdBy, String fullName, String nickname) {
         this.match = match;
         this.createdBy = createdBy;
         this.fullName = fullName;
+        this.nickname = nickname != null ? nickname : "";
     }
 
     @jakarta.persistence.PrePersist
@@ -70,6 +77,22 @@ public class GuestPlayer {
 
     public String getFullName() {
         return fullName;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public Integer getShirtNumber() {
+        return shirtNumber;
+    }
+
+    public void setShirtNumber(Integer shirtNumber) {
+        this.shirtNumber = shirtNumber;
     }
 
     public String getStatus() {

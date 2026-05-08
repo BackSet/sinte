@@ -34,7 +34,7 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer createGuestPlayer(UUID matchId, UUID createdByUserId, String fullName, List<String> positionCodes) {
+    public GuestPlayer createGuestPlayer(UUID matchId, UUID createdByUserId, String fullName, String nickname, List<String> positionCodes) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new DomainException("Partido no encontrado"));
         if (match.getStatus() == MatchStatus.FINISHED) {
@@ -48,7 +48,7 @@ public class GuestPlayerService {
             throw new DomainException("Solo DT o ADMIN pueden agregar invitados");
         }
 
-        GuestPlayer guest = new GuestPlayer(match, creator, fullName.trim());
+        GuestPlayer guest = new GuestPlayer(match, creator, fullName.trim(), nickname != null ? nickname.trim() : null);
         GuestPlayer saved = guestPlayerRepository.save(guest);
 
         if (positionCodes != null && !positionCodes.isEmpty()) {

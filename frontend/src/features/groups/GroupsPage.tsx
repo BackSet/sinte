@@ -24,6 +24,7 @@ type GroupMemberItem = {
   nickname?: string
   nicknameTag?: string
   playerHandle?: string
+  rol?: string
   addedAt: string
 }
 
@@ -323,6 +324,7 @@ export function GroupsPage() {
                   { key: 'handle', label: 'Codigo', render: (member) => (
                     <span className="ui-badge">{member.playerHandle ?? '-'}</span>
                   )},
+                  ...(membersQuery.data?.some(m => m.rol) ? [{ key: 'rol', label: 'Rol', render: (member: GroupMemberItem) => member.rol ? <span className="ui-badge">{member.rol}</span> : '-' }] : []),
                   {
                     key: 'actions',
                     label: '',

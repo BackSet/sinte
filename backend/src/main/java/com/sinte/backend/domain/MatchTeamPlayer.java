@@ -32,6 +32,10 @@ public class MatchTeamPlayer {
     @JoinColumn(name = "guest_player_id")
     private GuestPlayer guestPlayer;
 
+    @ManyToOne
+    @JoinColumn(name = "pair_id")
+    private MatchPair pair;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -46,6 +50,18 @@ public class MatchTeamPlayer {
     public MatchTeamPlayer(MatchTeam team, GuestPlayer guestPlayer) {
         this.team = team;
         this.guestPlayer = guestPlayer;
+    }
+
+    public MatchTeamPlayer(MatchTeam team, User user, MatchPair pair) {
+        this.team = team;
+        this.user = user;
+        this.pair = pair;
+    }
+
+    public MatchTeamPlayer(MatchTeam team, GuestPlayer guestPlayer, MatchPair pair) {
+        this.team = team;
+        this.guestPlayer = guestPlayer;
+        this.pair = pair;
     }
 
     @PrePersist
@@ -87,7 +103,18 @@ public class MatchTeamPlayer {
         if (user != null) {
             return user.getPlayerHandle();
         }
+        if (guestPlayer != null) {
+            String handle = guestPlayer.getNickname();
+            if (guestPlayer.getShirtNumber() != null) {
+                handle += "#" + guestPlayer.getShirtNumber();
+            }
+            return handle;
+        }
         return null;
+    }
+
+    public MatchPair getPair() {
+        return pair;
     }
 
     public String getPrimaryPosition() {

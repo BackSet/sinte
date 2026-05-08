@@ -7,6 +7,8 @@ import { Modal } from '../../components/ui/Modal'
 import { FormField } from '../../components/ui/FormField'
 import { DateTimeField } from '../../components/ui/DateTimeField'
 import { GroupSelector } from '../../components/ui/GroupSelector'
+import { PairBadge } from '../../components/ui/PairBadge'
+import { PairingStatusBar } from '../../components/ui/PairingStatusBar'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { useToastStore } from '../../store/toast-store'
 import { useAuthStore } from '../../store/auth-store'
@@ -122,11 +124,39 @@ type GuestPlayerItem = {
   matchId: string
   createdByUserId: string
   fullName: string
+  nickname: string
+  shirtNumber?: number
   status: string
   respondedAt: string | null
   createdAt: string
-  positions: Array<{ positionCode: string; priority: number }>
+  positions: Array<{ positionCode: string; priority: number; isPrimary: boolean }>
 }
+
+type PairingPlayer = {
+  userId: string | null
+  guestPlayerId: string | null
+  fullName: string
+  playerHandle?: string | null
+  primaryPositionCode: string
+  secondaryPositionCode?: string | null
+  isPrimary: boolean
+}
+
+type PairView = {
+  id: string
+  positionCode: string
+  playerA: PairingPlayer
+  playerB: PairingPlayer
+}
+
+type PairingPreviewResponse = {
+  pairs: PairView[]
+  unpaired: PairingPlayer[]
+  cupReached: boolean
+  totalConfirmed: number
+}
+
+type DetailTab = 'roster' | 'pairs' | 'teams' | 'guests'
 
 function toDateTimeLocalValue(value: string): string {
   const date = new Date(value)
@@ -165,8 +195,6 @@ function emptyMatchForm() {
   }
 }
 
-type DetailTab = 'roster' | 'teams' | 'guests'
-
 export function MatchesPage() {
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
@@ -183,6 +211,8 @@ export function MatchesPage() {
   const [teamSize, setTeamSize] = useState(2)
   const [draftTeams, setDraftTeams] = useState<TeamDraft[]>([])
   const [guestFullName, setGuestFullName] = useState('')
+  const [guestNickname, setGuestNickname] = useState('')
+  const [guestShirtNumber, setGuestShirtNumber] = useState<number | undefined>()
   const [guestPositionCodes, setGuestPositionCodes] = useState<string[]>([])
   const [matchForm, setMatchForm] = useState(emptyMatchForm())
 
@@ -303,16 +333,20 @@ export function MatchesPage() {
     mutationFn: async () => {
       await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/guest-players`, {
         fullName: guestFullName.trim(),
+        nickname: guestNickname.trim() || undefined,
         positionCodes: guestPositionCodes.length > 0 ? guestPositionCodes : undefined,
       })
     },
     onSuccess: () => {
       setGuestFullName('')
+      setGuestNickname('')
+      setGuestShirtNumber(undefined)
       setGuestPositionCodes([])
       addToast('success', 'Invitado agregado')
       queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
       queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatch?.id] })
       queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo agregar invitado')),
   })
@@ -340,6 +374,46 @@ export function MatchesPage() {
       queryClient.invalidateQueries({ queryKey: ['match-roster', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar invitado')),
+  })
+
+  const pairingQuery = useQuery({
+    queryKey: ['match-pairing', selectedMatch?.id],
+    queryFn: async () => (await apiClient.get<PairingPreviewResponse>(`/api/v1/matches/${selectedMatch!.id}/pairs/preview`)).data,
+    enabled: Boolean(selectedMatch) && isManager,
+  })
+
+  const generatePairsMutation = useMutation({
+    mutationFn: async () => (await apiClient.post<PairingPreviewResponse>(`/api/v1/matches/${selectedMatch!.id}/pairs`)).data,
+    onSuccess: (data) => {
+      addToast('success', `${data.pairs.length} parejas generadas`)
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudieron generar las parejas')),
+  })
+
+  const drawTeamsMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/pairs/draw`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Equipos sorteados correctamente')
+      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo completar el sorteo')),
+  })
+
+  const resetPairsMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.delete(`/api/v1/matches/${selectedMatch!.id}/pairs`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Parejas y equipos reiniciados')
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudieron resetear las parejas')),
   })
 
   const toggleGuestPosition = (code: string) => {
@@ -419,6 +493,7 @@ export function MatchesPage() {
 
   const detailTabs = [
     { label: 'Roster', active: detailTab === 'roster', onClick: () => setDetailTab('roster') },
+    ...(canManageTeams ? [{ label: 'Parejas', active: detailTab === 'pairs', onClick: () => setDetailTab('pairs') }] : []),
     ...(canManageTeams ? [{ label: 'Equipos', active: detailTab === 'teams', onClick: () => setDetailTab('teams') }] : []),
     ...(isManager ? [{ label: 'Invitados', active: detailTab === 'guests', onClick: () => setDetailTab('guests') }] : []),
   ]
@@ -684,6 +759,89 @@ export function MatchesPage() {
             </div>
           )}
 
+          {/* Pairs Tab */}
+          {detailTab === 'pairs' && canManageTeams && (
+            <div className="space-y-4">
+              {selectedMatch.targetPlayers && (
+                <PairingStatusBar
+                  confirmedCount={pairingQuery.data?.totalConfirmed ?? 0}
+                  targetPlayers={selectedMatch.targetPlayers}
+                  pairsCount={pairingQuery.data?.pairs.length ?? 0}
+                  cupReached={pairingQuery.data?.cupReached ?? false}
+                />
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="ui-button"
+                  onClick={() => generatePairsMutation.mutate()}
+                  disabled={generatePairsMutation.isPending}
+                >
+                  {generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}
+                </button>
+                <button
+                  className="ui-button"
+                  onClick={() => drawTeamsMutation.mutate()}
+                  disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
+                >
+                  {drawTeamsMutation.isPending ? 'Sorteando...' : 'Sortear equipos'}
+                </button>
+                <button
+                  className="ui-button-muted"
+                  onClick={() => resetPairsMutation.mutate()}
+                  disabled={resetPairsMutation.isPending}
+                >
+                  {resetPairsMutation.isPending ? 'Reiniciando...' : 'Reiniciar'}
+                </button>
+              </div>
+
+              {(generatePairsMutation.isError || drawTeamsMutation.isError || resetPairsMutation.isError) && (
+                <p className="text-sm text-[var(--danger)]">
+                  {getApiErrorMessage(generatePairsMutation.error ?? drawTeamsMutation.error ?? resetPairsMutation.error, 'No se pudo completar la operacion.')}
+                </p>
+              )}
+
+              {pairingQuery.isLoading && <p className="ui-text-muted text-sm">Cargando...</p>}
+
+              {pairingQuery.data && (
+                <>
+                  {pairingQuery.data.pairs.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="ui-detail-section-title">Parejas formadas ({pairingQuery.data.pairs.length})</p>
+                      {pairingQuery.data.pairs.map((pair, i) => (
+                        <PairBadge
+                          key={pair.id}
+                          playerA={pair.playerA}
+                          playerB={pair.playerB}
+                          positionCode={pair.positionCode}
+                          pairNumber={i + 1}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="ui-text-muted text-sm">Presiona "Generar parejas" para crear los emparejamientos.</p>
+                  )}
+
+                  {pairingQuery.data.unpaired.length > 0 && (
+                    <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-bg)] p-3">
+                      <p className="mb-2 text-sm font-medium">Jugadores sin pareja</p>
+                      <div className="flex flex-wrap gap-2">
+                        {pairingQuery.data.unpaired.map((p) => {
+                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                          return (
+                            <span key={key} className="rounded-md border px-2 py-1 text-xs">
+                              {p.fullName}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {/* Teams Tab */}
           {detailTab === 'teams' && canManageTeams && (
             <div className="space-y-4">
@@ -752,6 +910,14 @@ export function MatchesPage() {
                   <label className="ui-form-label">Nombre del invitado</label>
                   <input className="ui-input" placeholder="Nombre completo" value={guestFullName} onChange={(e) => setGuestFullName(e.target.value)} required />
                 </div>
+                <div className="min-w-32">
+                  <label className="ui-form-label">Apodo (opcional)</label>
+                  <input className="ui-input" placeholder="Apodo" value={guestNickname} onChange={(e) => setGuestNickname(e.target.value)} />
+                </div>
+                <div className="w-24">
+                  <label className="ui-form-label">Camiseta (opcional)</label>
+                  <input className="ui-input" type="number" placeholder="Nro" min={1} value={guestShirtNumber || ''} onChange={(e) => setGuestShirtNumber(e.target.value ? Number(e.target.value) : undefined)} />
+                </div>
                 <div className="flex-1">
                   <label className="ui-form-label">Posiciones (opcional)</label>
                   <div className="flex flex-wrap gap-1">
@@ -779,8 +945,9 @@ export function MatchesPage() {
                     <div key={guest.id} className="ui-muted-surface flex items-center justify-between rounded-lg px-3 py-2">
                       <div>
                         <p className="font-medium">{guest.fullName}</p>
+                        {guest.nickname && <p className="ui-text-muted text-xs">Apodo: {guest.nickname}{guest.shirtNumber ? `#${guest.shirtNumber}` : ''}</p>}
                         <p className="ui-text-muted text-xs">
-                          {guest.positions.length > 0 ? guest.positions.map((p) => positionLabel(p.positionCode)).join(', ') : 'Sin posicion'}
+                          {guest.positions.length > 0 ? guest.positions.filter(p => p.isPrimary).map(p => positionLabel(p.positionCode)).join(', ') || guest.positions[0] ? positionLabel(guest.positions[0].positionCode) : 'Sin posicion' : 'Sin posicion'}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

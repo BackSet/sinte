@@ -86,7 +86,7 @@ public class GroupService {
     }
 
     @Transactional
-    public SinteGroupMember addMemberByHandle(UUID requesterUserId, UUID groupId, String handle) {
+    public SinteGroupMember addMemberByHandle(UUID requesterUserId, UUID groupId, String handle, String rol) {
         SinteGroup group = requireGroupForRequester(requesterUserId, groupId, true);
         UserHandleService.HandleParts handleParts = userHandleService.parseHandle(handle);
         User user = userRepository.findByNicknameAndNicknameTag(handleParts.nickname(), handleParts.tag())
@@ -101,7 +101,7 @@ public class GroupService {
         if (sinteGroupMemberRepository.existsByGroupIdAndUserId(group.getId(), user.getId())) {
             throw new DomainException("El jugador ya pertenece al grupo");
         }
-        return sinteGroupMemberRepository.save(new SinteGroupMember(group, user));
+        return sinteGroupMemberRepository.save(new SinteGroupMember(group, user, rol));
     }
 
     @Transactional

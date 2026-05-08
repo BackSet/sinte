@@ -4,6 +4,7 @@ import com.sinte.backend.config.security.SecurityUtils;
 import com.sinte.backend.domain.Match;
 import com.sinte.backend.domain.enums.MatchStatus;
 import com.sinte.backend.service.MatchExportService;
+import com.sinte.backend.service.MatchPairingService;
 import com.sinte.backend.service.MatchService;
 import com.sinte.backend.service.dto.CreateMatchRequest;
 import jakarta.validation.Valid;
@@ -34,10 +35,12 @@ public class MatchesController {
 
     private final MatchService matchService;
     private final MatchExportService matchExportService;
+    private final MatchPairingService pairingService;
 
-    public MatchesController(MatchService matchService, MatchExportService matchExportService) {
+    public MatchesController(MatchService matchService, MatchExportService matchExportService, MatchPairingService pairingService) {
         this.matchService = matchService;
         this.matchExportService = matchExportService;
+        this.pairingService = pairingService;
     }
 
     @PostMapping
@@ -183,6 +186,44 @@ public class MatchesController {
                 .body(content);
     }
 
+    @GetMapping("/{matchId}/pairs/preview")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<PairingPreviewResponse> previewPairs(@PathVariable UUID matchId) {
+        MatchPairingService.PairingResult result = pairingService.previewPairs(matchId);
+        return ResponseEntity.ok(toPairingPreviewResponse(result));
+    }
+
+    @PostMapping("/{matchId}/pairs")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<PairingPreviewResponse> generatePairs(@PathVariable UUID matchId) {
+        UUID userId = SecurityUtils.currentUserId();
+        MatchPairingService.PairingResult result = pairingService.executePairing(matchId, userId);
+        return ResponseEntity.ok(toPairingPreviewResponse(result));
+    }
+
+    @PostMapping("/{matchId}/pairs/draw")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> drawAndAssignTeams(@PathVariable UUID matchId) {
+        pairingService.executeDrawAndAssignTeams(matchId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{matchId}/pairs")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> resetPairs(@PathVariable UUID matchId) {
+        pairingService.resetPairsAndTeams(matchId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{matchId}/attendance-open")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> toggleAttendanceOpen(@PathVariable UUID matchId, @RequestParam boolean open) {
+        Match match = matchService.getMatch(matchId);
+        match.setAttendanceOpen(open);
+        matchService.getMatch(matchId);
+        return ResponseEntity.ok().build();
+    }
+
     private MatchResponse toResponse(Match match) {
         MatchService.AttendanceSummary attendanceSummary = matchService.getAttendanceSummary(match.getId());
         return new MatchResponse(
@@ -205,7 +246,8 @@ public class MatchesController {
                         .toList(),
                 attendanceSummary.confirmedCount(),
                 attendanceSummary.pendingCount(),
-                match.getTargetPlayers()
+                match.getTargetPlayers(),
+                match.isAttendanceOpen()
         );
     }
 
@@ -245,6 +287,36 @@ public class MatchesController {
         );
     }
 
+    private PairingPreviewResponse toPairingPreviewResponse(MatchPairingService.PairingResult result) {
+        return new PairingPreviewResponse(
+                result.pairs().stream().map(this::toPairResponse).toList(),
+                result.unpaired().stream().map(this::toPairingPlayerResponse).toList(),
+                result.cupReached(),
+                result.totalConfirmed()
+        );
+    }
+
+    private PairResponse toPairResponse(MatchPairingService.PairView pair) {
+        return new PairResponse(
+                pair.id(),
+                pair.positionCode(),
+                toPairingPlayerResponse(pair.playerA()),
+                toPairingPlayerResponse(pair.playerB())
+        );
+    }
+
+    private PairingPlayerResponse toPairingPlayerResponse(MatchPairingService.PairingPlayer player) {
+        return new PairingPlayerResponse(
+                player.userId(),
+                player.guestPlayerId(),
+                player.fullName(),
+                player.playerHandle(),
+                player.primaryPositionCode(),
+                player.secondaryPositionCode(),
+                player.isPrimary()
+        );
+    }
+
     public record MatchUpsertRequest(
             @NotBlank String title,
             String description,
@@ -272,7 +344,8 @@ public class MatchesController {
             List<GroupSummaryResponse> targetGroups,
             long confirmedCount,
             long pendingCount,
-            Integer targetPlayers
+            Integer targetPlayers,
+            boolean attendanceOpen
     ) {
     }
 
@@ -338,6 +411,33 @@ public class MatchesController {
             String playerHandle,
             String primaryPositionCode,
             OffsetDateTime respondedAt
+    ) {
+    }
+
+    public record PairingPreviewResponse(
+            List<PairResponse> pairs,
+            List<PairingPlayerResponse> unpaired,
+            boolean cupReached,
+            int totalConfirmed
+    ) {
+    }
+
+    public record PairResponse(
+            UUID id,
+            String positionCode,
+            PairingPlayerResponse playerA,
+            PairingPlayerResponse playerB
+    ) {
+    }
+
+    public record PairingPlayerResponse(
+            UUID userId,
+            UUID guestPlayerId,
+            String fullName,
+            String playerHandle,
+            String primaryPositionCode,
+            String secondaryPositionCode,
+            boolean isPrimary
     ) {
     }
 }

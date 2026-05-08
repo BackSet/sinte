@@ -19,13 +19,20 @@ public class Position {
     @Column(name = "sort_order")
     private Short sortOrder;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     protected Position() {
     }
 
-    public Position(String code, String name, Short sortOrder) {
+public Position(String code, String name, Short sortOrder) {
         this.code = code;
         this.name = name;
         this.sortOrder = sortOrder;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public String getCode() {

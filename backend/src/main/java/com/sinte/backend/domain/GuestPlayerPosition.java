@@ -35,6 +35,9 @@ public class GuestPlayerPosition {
     @Column(nullable = false)
     private short priority;
 
+    @Column(name = "is_primary", nullable = false)
+    private boolean isPrimary = false;
+
     protected GuestPlayerPosition() {
     }
 
@@ -58,5 +61,13 @@ public class GuestPlayerPosition {
 
     public short getPriority() {
         return priority;
+    }
+
+    public boolean isPrimary() {
+        return isPrimary;
+    }
+
+    public void setPrimary(boolean primary) {
+        this.isPrimary = primary;
     }
 }

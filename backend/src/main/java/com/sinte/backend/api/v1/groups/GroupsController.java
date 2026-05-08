@@ -113,7 +113,7 @@ public class GroupsController {
             @PathVariable UUID groupId,
             @Valid @RequestBody AddMemberRequest request
     ) {
-        SinteGroupMember member = groupService.addMemberByHandle(SecurityUtils.currentUserId(), groupId, request.playerHandle());
+        SinteGroupMember member = groupService.addMemberByHandle(SecurityUtils.currentUserId(), groupId, request.playerHandle(), request.rol());
         return ResponseEntity.ok(toMemberResponse(member));
     }
 
@@ -132,6 +132,7 @@ public class GroupsController {
                 member.getUser().getNickname(),
                 member.getUser().getNicknameTag(),
                 member.getUser().getPlayerHandle(),
+                member.getRol(),
                 member.getCreatedAt()
         );
     }
@@ -142,7 +143,8 @@ public class GroupsController {
     }
 
     public record AddMemberRequest(
-            @NotBlank String playerHandle
+            @NotBlank String playerHandle,
+            String rol
     ) {
     }
 
@@ -162,6 +164,7 @@ public class GroupsController {
             String nickname,
             String nicknameTag,
             String playerHandle,
+            String rol,
             OffsetDateTime addedAt
     ) {
     }

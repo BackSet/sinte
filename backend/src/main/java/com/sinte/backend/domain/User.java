@@ -34,6 +34,9 @@ public class User {
     @Column(name = "nickname_tag", length = 4)
     private String nicknameTag;
 
+    @Column(name = "shirt_number", nullable = false)
+    private int shirtNumber = 0;
+
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
@@ -121,11 +124,19 @@ public class User {
         this.nicknameTag = nicknameTag;
     }
 
+    public int getShirtNumber() {
+        return shirtNumber;
+    }
+
+    public void setShirtNumber(int shirtNumber) {
+        this.shirtNumber = shirtNumber;
+    }
+
     public String getPlayerHandle() {
-        if (nickname == null || nicknameTag == null) {
+        if (nickname == null || shirtNumber == 0) {
             return null;
         }
-        return nickname + "#" + nicknameTag;
+        return nickname + "#" + shirtNumber;
     }
 
     public String getPasswordHash() {

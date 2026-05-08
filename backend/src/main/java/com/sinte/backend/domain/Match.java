@@ -62,6 +62,9 @@ public class Match {
     @Column(name = "target_players")
     private Integer targetPlayers;
 
+    @Column(name = "attendance_open", nullable = false)
+    private boolean attendanceOpen = true;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -148,7 +151,11 @@ public class Match {
     }
 
     public boolean isAttendanceOpen() {
-        return this.status == MatchStatus.SCHEDULED && !this.startsAt.isBefore(OffsetDateTime.now());
+        return attendanceOpen;
+    }
+
+    public void setAttendanceOpen(boolean attendanceOpen) {
+        this.attendanceOpen = attendanceOpen;
     }
 
     public void update(String title, String description, String location, OffsetDateTime startsAt, OffsetDateTime endsAt) {

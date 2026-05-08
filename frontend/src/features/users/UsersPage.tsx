@@ -21,6 +21,7 @@ type UserItem = {
   phone: string
   nickname?: string
   nicknameTag?: string
+  shirtNumber?: number
   playerHandle?: string
   active: boolean
   roles: string[]
@@ -33,7 +34,7 @@ type UserPositionItem = {
 }
 
 function emptyUserForm() {
-  return { fullName: '', email: '', phone: '', nickname: '', password: '' }
+  return { fullName: '', email: '', phone: '', nickname: '', shirtNumber: '', password: '' }
 }
 
 export function UsersPage() {
@@ -67,6 +68,7 @@ export function UsersPage() {
         email: userForm.email,
         phone: userForm.phone,
         nickname: userForm.nickname || undefined,
+        shirtNumber: userForm.shirtNumber ? Number(userForm.shirtNumber) : undefined,
         password: userForm.password,
         initialRole: 'PLAYER',
       })
@@ -276,6 +278,18 @@ export function UsersPage() {
           />
         </FormField>
 
+        <FormField label="Numero de camiseta">
+          <input
+            className="ui-input"
+            type="number"
+            placeholder="Ej: 10"
+            min={1}
+            max={99}
+            value={userForm.shirtNumber}
+            onChange={(e) => setUserForm({ ...userForm, shirtNumber: e.target.value })}
+          />
+        </FormField>
+
         <FormField label="Contrasena temporal">
           <input
             className="ui-input"
@@ -317,6 +331,7 @@ export function UsersPage() {
             <DetailModal.InfoRow label="Correo" value={viewingUser.email} />
             <DetailModal.InfoRow label="Telefono" value={viewingUser.phone} />
             {viewingUser.nickname && <DetailModal.InfoRow label="Apodo" value={viewingUser.nickname} />}
+            {viewingUser.shirtNumber && <DetailModal.InfoRow label="Camiseta" value={`#${viewingUser.shirtNumber}`} />}
             {viewingUser.playerHandle && <DetailModal.InfoRow label="Codigo" value={viewingUser.playerHandle} />}
           </DetailModal.Section>
 

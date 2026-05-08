@@ -39,7 +39,7 @@ public class GuestPlayersController {
     ) {
         UUID userId = SecurityUtils.currentUserId();
         GuestPlayer guest = guestPlayerService.createGuestPlayer(
-                matchId, userId, request.fullName(), request.positionCodes()
+                matchId, userId, request.fullName(), request.nickname(), request.positionCodes()
         );
         return ResponseEntity.ok(toResponse(guest));
     }
@@ -84,15 +84,18 @@ public class GuestPlayersController {
                 guest.getMatch().getId(),
                 guest.getCreatedBy().getId(),
                 guest.getFullName(),
+                guest.getNickname(),
+                guest.getShirtNumber(),
                 guest.getStatus(),
                 guest.getRespondedAt(),
                 guest.getCreatedAt(),
-                positions.stream().map(p -> new PositionEntry(p.getPositionCode(), p.getPriority())).toList()
+                positions.stream().map(p -> new PositionEntry(p.getPositionCode(), p.getPriority(), p.isPrimary())).toList()
         );
     }
 
     public record CreateGuestPlayerRequest(
             @NotBlank @Size(max = 120) String fullName,
+            String nickname,
             List<String> positionCodes
     ) {
     }
@@ -107,6 +110,8 @@ public class GuestPlayersController {
             UUID matchId,
             UUID createdByUserId,
             String fullName,
+            String nickname,
+            Integer shirtNumber,
             String status,
             OffsetDateTime respondedAt,
             OffsetDateTime createdAt,
@@ -114,6 +119,6 @@ public class GuestPlayersController {
     ) {
     }
 
-    public record PositionEntry(String positionCode, short priority) {
+    public record PositionEntry(String positionCode, short priority, boolean isPrimary) {
     }
 }

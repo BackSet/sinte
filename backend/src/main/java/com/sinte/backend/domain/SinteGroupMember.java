@@ -32,15 +32,19 @@ public class SinteGroupMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(length = 30)
+    private String rol;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     protected SinteGroupMember() {
     }
 
-    public SinteGroupMember(SinteGroup group, User user) {
+    public SinteGroupMember(SinteGroup group, User user, String rol) {
         this.group = group;
         this.user = user;
+        this.rol = rol;
     }
 
     @PrePersist
@@ -58,6 +62,14 @@ public class SinteGroupMember {
 
     public User getUser() {
         return user;
+    }
+
+    public String getRol() {
+        return rol;
+    }
+
+    public void setRol(String rol) {
+        this.rol = rol;
     }
 
     public OffsetDateTime getCreatedAt() {
