@@ -47,6 +47,7 @@ export function ProfilePage() {
     email: '',
     phone: '',
     nickname: '',
+    nicknameTag: '',
     shirtNumber: 0,
   })
   const [selectedPositions, setSelectedPositions] = useState<Array<{ positionCode: string; priority: number }>>([])
@@ -58,6 +59,7 @@ export function ProfilePage() {
         email: profileQuery.data.email,
         phone: profileQuery.data.phone,
         nickname: profileQuery.data.nickname ?? '',
+        nicknameTag: profileQuery.data.nicknameTag ?? '',
         shirtNumber: profileQuery.data.shirtNumber,
       })
     }
@@ -199,6 +201,17 @@ export function ProfilePage() {
                 onChange={(e) => handleFieldChange('nickname', e.target.value)}
                 maxLength={80}
                 placeholder="Ej: crack"
+              />
+            </label>
+            <label className="block">
+              <span className="ui-text-muted mb-1 block text-xs font-medium">Tag</span>
+              <input
+                type="text"
+                className="ui-input w-full"
+                value={form.nicknameTag}
+                onChange={(e) => handleFieldChange('nicknameTag', e.target.value.toUpperCase())}
+                maxLength={10}
+                placeholder="Ej: MITEAM123"
               />
             </label>
             <label className="block">

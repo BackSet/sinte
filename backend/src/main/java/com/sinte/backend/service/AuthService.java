@@ -197,8 +197,13 @@ public class AuthService {
         user.setFullName(request.fullName());
         user.setNickname(request.nickname());
         user.setShirtNumber(request.shirtNumber());
-        userHandleService.ensureHandle(user, user.getId());
-
+        if (request.nicknameTag() != null && !request.nicknameTag().isBlank()) {
+            String normalizedTag = request.nicknameTag().trim().toUpperCase();
+            if (userRepository.existsByNicknameAndNicknameTag(user.getNickname(), normalizedTag, user.getId())) {
+                throw new DomainException("El tag ya esta en uso");
+            }
+            user.setNicknameTag(normalizedTag);
+        }
         userRepository.save(user);
         return me(userId);
     }
