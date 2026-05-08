@@ -38,7 +38,6 @@ public class MatchPairingService {
     private final MatchPairRepository matchPairRepository;
     private final MatchTeamRepository matchTeamRepository;
     private final MatchTeamPlayerRepository matchTeamPlayerRepository;
-    private final MatchRepository matchRepository;
 
     public MatchPairingService(
             MatchAttendanceRepository matchAttendanceRepository,
@@ -47,8 +46,7 @@ public class MatchPairingService {
             GuestPlayerPositionRepository guestPlayerPositionRepository,
             MatchPairRepository matchPairRepository,
             MatchTeamRepository matchTeamRepository,
-            MatchTeamPlayerRepository matchTeamPlayerRepository,
-            MatchRepository matchRepository
+            MatchTeamPlayerRepository matchTeamPlayerRepository
     ) {
         this.matchAttendanceRepository = matchAttendanceRepository;
         this.guestPlayerRepository = guestPlayerRepository;
@@ -57,7 +55,6 @@ public class MatchPairingService {
         this.matchPairRepository = matchPairRepository;
         this.matchTeamRepository = matchTeamRepository;
         this.matchTeamPlayerRepository = matchTeamPlayerRepository;
-        this.matchRepository = matchRepository;
     }
 
     public record PairingResult(

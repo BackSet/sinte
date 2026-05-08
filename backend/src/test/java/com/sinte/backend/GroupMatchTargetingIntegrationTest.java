@@ -70,7 +70,7 @@ class GroupMatchTargetingIntegrationTest {
         ));
 
         SinteGroup group = groupService.createGroup(dt.userId(), "Titulares");
-        SinteGroupMember membership = groupService.addMemberByHandle(dt.userId(), group.getId(), playerInGroup.playerHandle());
+        SinteGroupMember membership = groupService.addMemberByHandle(dt.userId(), group.getId(), playerInGroup.playerHandle(), "TITULAR");
         assertThat(membership.getUser().getId()).isEqualTo(playerInGroup.userId());
 
         MatchConfig config = matchConfigService.createConfig("Cancha Norte", 14, 90, "America/Bogota", "Test config");
