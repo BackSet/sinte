@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, getApiErrorMessage } from '../../lib/api-client'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
@@ -112,13 +112,6 @@ type Team = {
   players: TeamPlayer[]
 }
 
-type TeamDraft = {
-  teamNumber: number
-  name: string
-  playerIds: string[]
-  guestPlayerIds: string[]
-}
-
 type GuestPlayerItem = {
   id: string
   matchId: string
@@ -208,8 +201,6 @@ export function MatchesPage() {
   const [selectedMatch, setSelectedMatch] = useState<MatchItem | null>(null)
   const [detailTab, setDetailTab] = useState<DetailTab>('roster')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SCHEDULED' | 'CANCELLED'>('ALL')
-  const [teamSize, setTeamSize] = useState(2)
-  const [draftTeams, setDraftTeams] = useState<TeamDraft[]>([])
   const [guestFullName, setGuestFullName] = useState('')
   const [guestNickname, setGuestNickname] = useState('')
   const [guestShirtNumber, setGuestShirtNumber] = useState<number | undefined>()
@@ -281,38 +272,6 @@ export function MatchesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matches'] })
       setDetailModalOpen(false)
-    },
-  })
-
-  const suggestTeamsMutation = useMutation({
-    mutationFn: async () =>
-      (await apiClient.post<Team[]>(`/api/v1/matches/${selectedMatch!.id}/teams/suggest?teamSize=${teamSize}`)).data,
-    onSuccess: (teams) => {
-      setDraftTeams(
-        teams.map((team) => ({
-          teamNumber: team.teamNumber,
-          name: team.name,
-          playerIds: team.players.filter((p) => p.userId).map((p) => p.userId!),
-          guestPlayerIds: team.players.filter((p) => p.guestPlayerId).map((p) => p.guestPlayerId!),
-        })),
-      )
-      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
-    },
-  })
-
-  const saveTeamsMutation = useMutation({
-    mutationFn: async () => {
-      await apiClient.put(`/api/v1/matches/${selectedMatch!.id}/teams`, {
-        teams: draftTeams.map((team) => ({
-          teamNumber: team.teamNumber,
-          name: team.name,
-          playerIds: team.playerIds,
-          guestPlayerIds: team.guestPlayerIds,
-        })),
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
     },
   })
 
@@ -432,19 +391,6 @@ export function MatchesPage() {
     }))
   }
 
-  useEffect(() => {
-    if (!teamsQuery.data) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDraftTeams(
-      teamsQuery.data.map((team) => ({
-        teamNumber: team.teamNumber,
-        name: team.name,
-        playerIds: team.players.filter((p) => p.userId).map((p) => p.userId!),
-        guestPlayerIds: team.players.filter((p) => p.guestPlayerId).map((p) => p.guestPlayerId!),
-      })),
-    )
-  }, [teamsQuery.data])
-
   const openDetail = (match: MatchItem) => {
     setSelectedMatch(match)
     setDetailTab('roster')
@@ -463,34 +409,8 @@ export function MatchesPage() {
     }
   }
 
-  const toggleDraftPlayer = (teamNumber: number, playerId: string, isGuest: boolean) => {
-    setDraftTeams((current) =>
-      current.map((team) => {
-        if (team.teamNumber !== teamNumber) {
-          return {
-            ...team,
-            playerIds: isGuest ? team.playerIds : team.playerIds.filter((id) => id !== playerId),
-            guestPlayerIds: isGuest ? team.guestPlayerIds.filter((id) => id !== playerId) : team.guestPlayerIds,
-          }
-        }
-        if (isGuest) {
-          const exists = team.guestPlayerIds.includes(playerId)
-          return { ...team, guestPlayerIds: exists ? team.guestPlayerIds.filter((id) => id !== playerId) : [...team.guestPlayerIds, playerId] }
-        } else {
-          const exists = team.playerIds.includes(playerId)
-          return { ...team, playerIds: exists ? team.playerIds.filter((id) => id !== playerId) : [...team.playerIds, playerId] }
-        }
-      }),
-    )
-  }
-
   const visibleMatches = (matchesQuery.data ?? []).filter((match) =>
     statusFilter === 'ALL' ? true : match.status === statusFilter,
-  )
-  const assignedPlayerIds = new Set(draftTeams.flatMap((team) => team.playerIds))
-  const assignedGuestIds = new Set(draftTeams.flatMap((team) => team.guestPlayerIds))
-  const unassignedPlayers = (confirmedQuery.data ?? []).filter(
-    (p) => p.userId && !assignedPlayerIds.has(p.userId) && !assignedGuestIds.has(p.guestPlayerId ?? ''),
   )
 
   const detailTabs = [
@@ -763,7 +683,7 @@ export function MatchesPage() {
 
           {/* Pairs Tab */}
           {detailTab === 'pairs' && canManageTeams && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {selectedMatch.targetPlayers && (
                 <PairingStatusBar
                   confirmedCount={pairingQuery.data?.totalConfirmed ?? 0}
@@ -773,28 +693,49 @@ export function MatchesPage() {
                 />
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  className="ui-button"
-                  onClick={() => generatePairsMutation.mutate()}
-                  disabled={generatePairsMutation.isPending}
-                >
-                  {generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}
-                </button>
-                <button
-                  className="ui-button"
-                  onClick={() => drawTeamsMutation.mutate()}
-                  disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
-                >
-                  {drawTeamsMutation.isPending ? 'Sorteando...' : 'Sortear equipos'}
-                </button>
-                <button
-                  className="ui-button-muted"
-                  onClick={() => resetPairsMutation.mutate()}
-                  disabled={resetPairsMutation.isPending}
-                >
-                  {resetPairsMutation.isPending ? 'Reiniciando...' : 'Reiniciar'}
-                </button>
+              <div className="rounded-lg border border-[var(--border-soft)] p-4">
+                <h4 className="mb-3 text-sm font-semibold">Flujo de emparejamiento</h4>
+                <div className="mb-4 flex items-center gap-3">
+                  <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${pairingQuery.data?.pairs.length ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">1</span>
+                    Generar parejas
+                  </div>
+                  <span className="text-[var(--text-secondary)]">→</span>
+                  <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${pairingQuery.data?.pairs.length ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">2</span>
+                    Sortear equipos
+                  </div>
+                  <span className="text-[var(--text-secondary)]">→</span>
+                  <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${teamsQuery.data && teamsQuery.data.length > 0 ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">3</span>
+                    Ajustar si es necesario
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="ui-button"
+                    onClick={() => generatePairsMutation.mutate()}
+                    disabled={generatePairsMutation.isPending}
+                  >
+                    {generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}
+                  </button>
+                  <button
+                    className="ui-button-primary"
+                    onClick={() => drawTeamsMutation.mutate()}
+                    disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
+                  >
+                    {drawTeamsMutation.isPending ? 'Sorteando...' : 'Sortear equipos'}
+                  </button>
+                  {(pairingQuery.data?.pairs.length ?? 0) > 0 && (
+                    <button
+                      className="ui-button-muted"
+                      onClick={() => resetPairsMutation.mutate()}
+                      disabled={resetPairsMutation.isPending}
+                    >
+                      {resetPairsMutation.isPending ? 'Reiniciando...' : 'Reiniciar todo'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {(generatePairsMutation.isError || drawTeamsMutation.isError || resetPairsMutation.isError) && (
@@ -808,30 +749,35 @@ export function MatchesPage() {
               {pairingQuery.data && (
                 <>
                   {pairingQuery.data.pairs.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="ui-detail-section-title">Parejas formadas ({pairingQuery.data.pairs.length})</p>
-                      {pairingQuery.data.pairs.map((pair, i) => (
-                        <PairBadge
-                          key={pair.id}
-                          playerA={pair.playerA}
-                          playerB={pair.playerB}
-                          positionCode={pair.positionCode}
-                          pairNumber={i + 1}
-                        />
-                      ))}
+                    <div>
+                      <h4 className="mb-3 text-sm font-semibold">Parejas ({pairingQuery.data.pairs.length})</h4>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {pairingQuery.data.pairs.map((pair, i) => (
+                          <PairBadge
+                            key={pair.id}
+                            playerA={pair.playerA}
+                            playerB={pair.playerB}
+                            positionCode={pair.positionCode}
+                            pairNumber={i + 1}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ) : (
-                    <p className="ui-text-muted text-sm">Presiona "Generar parejas" para crear los emparejamientos.</p>
+                    <div className="rounded-lg border border-dashed border-[var(--border-soft)] p-8 text-center">
+                      <p className="ui-text-muted text-sm">Presiona "Generar parejas" para crear los emparejamientos automaticamente.</p>
+                    </div>
                   )}
 
                   {pairingQuery.data.unpaired.length > 0 && (
-                    <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-bg)] p-3">
-                      <p className="mb-2 text-sm font-medium">Jugadores sin pareja</p>
+                    <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-bg)] p-4">
+                      <p className="mb-2 text-sm font-medium">Jugadores sin pareja ({pairingQuery.data.unpaired.length})</p>
                       <div className="flex flex-wrap gap-2">
                         {pairingQuery.data.unpaired.map((p, index) => {
                           const key = p.userId ?? p.guestPlayerId ?? `unpaired-${index}`
                           return (
-                            <span key={key} className="rounded-md border px-2 py-1 text-xs">
+                            <span key={key} className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] px-2 py-1 text-xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]"></span>
                               {p.fullName}
                             </span>
                           )
@@ -846,58 +792,72 @@ export function MatchesPage() {
 
           {/* Teams Tab */}
           {detailTab === 'teams' && canManageTeams && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-sm">Tamano de equipo:</label>
-                <input className="ui-input w-24" type="number" min={1} value={teamSize} onChange={(event) => setTeamSize(Math.max(1, Number(event.target.value)))} />
-                <button className="ui-button-muted" onClick={() => suggestTeamsMutation.mutate()}>
-                  {suggestTeamsMutation.isPending ? 'Sugiriendo...' : 'Sugerir equipos'}
-                </button>
-                <button className="ui-button" onClick={() => saveTeamsMutation.mutate()} disabled={draftTeams.length === 0}>
-                  {saveTeamsMutation.isPending ? 'Guardando...' : 'Guardar equipos'}
-                </button>
-              </div>
-
-              {(suggestTeamsMutation.isError || saveTeamsMutation.isError) && (
-                <p className="text-sm text-[var(--danger)]">
-                  {getApiErrorMessage(suggestTeamsMutation.error ?? saveTeamsMutation.error, 'No se pudo completar la operacion de equipos.')}
-                </p>
+            <div className="space-y-6">
+              {teamsQuery.data && teamsQuery.data.length > 0 ? (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="text-sm font-semibold">Equipos sorteados</h4>
+                    <button
+                      className="ui-button-muted text-xs"
+                      onClick={() => drawTeamsMutation.mutate()}
+                      disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
+                    >
+                      {drawTeamsMutation.isPending ? 'Sorteando...' : 'Volver a sortear'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {teamsQuery.data.map((team) => (
+                      <div
+                        key={team.teamNumber}
+                        className={`rounded-lg border p-4 ${
+                          team.teamNumber === 1
+                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/20'
+                            : 'border-orange-700 bg-orange-50 dark:bg-orange-950/20'
+                        }`}
+                      >
+                        <div className="mb-3 flex items-center justify-between">
+                          <h4 className="font-semibold">{team.name}</h4>
+                          <span className="ui-text-muted text-xs">{team.players.length} jugadores</span>
+                        </div>
+                        <div className="space-y-2">
+                          {team.players.map((player, i) => {
+                            const key = player.userId ?? player.guestPlayerId ?? `team-${team.teamNumber}-${i}`
+                            const handle = player.playerHandle
+                              ? player.playerHandle
+                              : player.guestPlayerId ? `[Inv.]` : ''
+                            return (
+                              <div key={key} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
+                                <div className="flex items-center gap-2">
+                                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                                    team.teamNumber === 1
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-orange-700 text-white'
+                                  }`}>
+                                    {i + 1}
+                                  </span>
+                                  <span className="text-sm font-medium">{player.fullName}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {handle && <span className="ui-text-muted text-xs">{handle}</span>}
+                                  <span className="rounded border px-1.5 py-0.5 text-xs">{positionLabel(player.primaryPositionCode)}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                          {team.players.length === 0 && (
+                            <p className="ui-text-muted py-2 text-center text-sm">Sin jugadores</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-lg border border-dashed border-[var(--border-soft)] p-8 text-center">
+                  <p className="text-sm font-medium">Aun no hay equipos sorteados</p>
+                  <p className="ui-text-muted mt-1 text-xs">Ve a la pestaña "Parejas" y presiona "Sortear equipos" para generar los equipos automaticamente.</p>
+                </div>
               )}
-
-              <div className="ui-muted-surface rounded-lg p-3">
-                <p className="text-sm font-medium">Sin asignar ({unassignedPlayers.length})</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {unassignedPlayers.map((player, index) => {
-                    const key = player.userId ?? player.guestPlayerId ?? `unassigned-${index}`
-                    return <span key={key} className="rounded-md border px-2 py-1 text-xs">{player.fullName}{player.guestPlayerId ? ' (Inv.)' : ''}</span>
-                  })}
-                  {unassignedPlayers.length === 0 && <span className="ui-text-muted text-xs">Todos asignados.</span>}
-                </div>
-              </div>
-
-              {draftTeams.map((team) => (
-                <div key={team.teamNumber} className="ui-muted-surface rounded-lg p-3">
-                  <div className="mb-2">
-                    <input className="ui-input" value={team.name} onChange={(event) =>
-                      setDraftTeams((current) => current.map((item) => item.teamNumber === team.teamNumber ? { ...item, name: event.target.value } : item))
-                    } />
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {(confirmedQuery.data ?? []).map((player, index) => {
-                      const key = player.userId ?? player.guestPlayerId ?? `team-${team.teamNumber}-${index}`
-                      const isGuest = Boolean(player.guestPlayerId)
-                      const playerId = isGuest ? player.guestPlayerId : player.userId
-                      const isInTeam = isGuest ? team.guestPlayerIds.includes(playerId!) : team.playerIds.includes(playerId!)
-                      return (
-                        <label key={key} className="inline-flex items-center gap-2 text-sm">
-                          <input type="checkbox" checked={isInTeam} onChange={() => toggleDraftPlayer(team.teamNumber, playerId!, isGuest)} />
-                          <span>{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{isGuest ? ' [Inv.]' : ''}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
             </div>
           )}
 
