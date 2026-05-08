@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/auth-store'
 import { useToastStore } from '../../store/toast-store'
 import { getApiErrorMessage } from '../../lib/api-client'
 import { Icon } from '../../components/ui/Icon'
+import { PLAYER_POSITION_OPTIONS, type PlayerPosition } from '../../lib/player-positions'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -16,8 +17,10 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
+  const [tag, setTag] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedPositions, setSelectedPositions] = useState<Array<{ positionCode: string; priority: number }>>([])
 
   const mutation = useMutation({
     mutationFn: register,
@@ -40,6 +43,16 @@ export function RegisterPage() {
     },
   })
 
+  function togglePosition(code: PlayerPosition) {
+    setSelectedPositions((prev) => {
+      const exists = prev.find((p) => p.positionCode === code)
+      if (exists) {
+        return prev.filter((p) => p.positionCode !== code)
+      }
+      return [...prev, { positionCode: code, priority: prev.length + 1 }]
+    })
+  }
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     mutation.mutate({
@@ -47,7 +60,9 @@ export function RegisterPage() {
       email,
       phone,
       nickname: nickname || undefined,
+      tag: tag || undefined,
       password,
+      positions: selectedPositions.length > 0 ? selectedPositions : undefined,
     })
   }
 
@@ -95,9 +110,21 @@ export function RegisterPage() {
             className="ui-input"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
+            maxLength={80}
           />
         </div>
         <div>
+          <label className="mb-1.5 block text-sm font-medium" htmlFor="register-tag">Tag (4-10 caracteres, opcional)</label>
+          <input
+            id="register-tag"
+            className="ui-input"
+            value={tag}
+            onChange={(e) => setTag(e.target.value.toUpperCase())}
+            maxLength={10}
+            placeholder="Ej: MITEAM123"
+          />
+        </div>
+        <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium" htmlFor="register-password">Contrasena</label>
           <div className="relative">
             <input
@@ -119,6 +146,39 @@ export function RegisterPage() {
             </button>
           </div>
         </div>
+
+        <div className="md:col-span-2">
+          <label className="mb-1.5 block text-sm font-medium">Posiciones</label>
+          <div className="flex flex-wrap gap-2">
+            {PLAYER_POSITION_OPTIONS.map((pos) => {
+              const selected = selectedPositions.find((p) => p.positionCode === pos.value)
+              return (
+                <button
+                  key={pos.value}
+                  type="button"
+                  onClick={() => togglePosition(pos.value)}
+                  className={`ui-badge cursor-pointer transition-colors ${
+                    selected
+                      ? 'ui-badge-primary'
+                      : 'ui-badge-muted hover:opacity-80'
+                  }`}
+                >
+                  {selected && <span className="mr-1 text-[10px] font-bold">{selected.priority}</span>}
+                  {pos.label}
+                </button>
+              )
+            })}
+          </div>
+          {selectedPositions.length > 0 && (
+            <p className="ui-text-muted mt-1.5 text-xs">
+              Seleccionadas: {selectedPositions.map((p) => {
+                const opt = PLAYER_POSITION_OPTIONS.find((o) => o.value === p.positionCode)
+                return opt?.label ?? p.positionCode
+              }).join(', ')}
+            </p>
+          )}
+        </div>
+
         {mutation.isError && (
           <div className="md:col-span-2 rounded-lg border border-[var(--danger)]/20 bg-[var(--danger)]/5 px-3 py-2 text-sm text-[var(--danger)]">
             {getApiErrorMessage(mutation.error, 'No se pudo completar el registro.')}

@@ -11,10 +11,13 @@ import com.sinte.backend.config.security.JwtService;
 import com.sinte.backend.domain.RefreshToken;
 import com.sinte.backend.domain.Role;
 import com.sinte.backend.domain.User;
+import com.sinte.backend.domain.UserPosition;
 import com.sinte.backend.domain.UserRole;
 import com.sinte.backend.domain.enums.RoleCode;
+import com.sinte.backend.repository.PositionRepository;
 import com.sinte.backend.repository.RefreshTokenRepository;
 import com.sinte.backend.repository.RoleRepository;
+import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +42,8 @@ public class AuthService {
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserHandleService userHandleService;
+    private final UserPositionRepository userPositionRepository;
+    private final PositionRepository positionRepository;
 
     public AuthService(
             UserRepository userRepository,
@@ -48,7 +53,9 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             JwtProperties jwtProperties,
-            UserHandleService userHandleService
+            UserHandleService userHandleService,
+            UserPositionRepository userPositionRepository,
+            PositionRepository positionRepository
     ) {
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
@@ -58,6 +65,8 @@ public class AuthService {
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
         this.userHandleService = userHandleService;
+        this.userPositionRepository = userPositionRepository;
+        this.positionRepository = positionRepository;
     }
 
     @Transactional
@@ -67,16 +76,32 @@ public class AuthService {
             throw new DomainException("El correo ya esta registrado");
         }
 
+        String tag = request.tag();
+        if (tag != null && (tag.length() < 4 || tag.length() > 10)) {
+            throw new DomainException("El tag debe tener entre 4 y 10 caracteres");
+        }
+
         User user = new User(
                 request.fullName(),
                 normalizedEmail,
                 request.phone(),
                 request.nickname(),
-                null,
+                tag,
                 passwordEncoder.encode(request.password())
         );
         userHandleService.ensureHandle(user, null);
         User savedUser = userRepository.save(user);
+
+        if (request.positions() != null && !request.positions().isEmpty()) {
+            for (RegisterRequest.PositionRequest posReq : request.positions()) {
+                if (positionRepository.existsById(posReq.positionCode())) {
+                    boolean isPrimary = posReq == request.positions().get(0);
+                    UserPosition up = new UserPosition(savedUser, posReq.positionCode(), (short) posReq.priority());
+                    up.setPrimary(isPrimary);
+                    userPositionRepository.save(up);
+                }
+            }
+        }
 
         boolean firstUser = userRepository.count() == 1;
         if (firstUser) {

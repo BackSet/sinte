@@ -14,7 +14,7 @@ public class UserHandleService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final Pattern HANDLE_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,20}#[A-Za-z0-9]{4}$");
     private static final Pattern HANDLE_BASE_PATTERN = Pattern.compile("^[a-z0-9_]{3,20}$");
-    private static final Pattern TAG_PATTERN = Pattern.compile("^[A-Z0-9]{4}$");
+    private static final Pattern TAG_PATTERN = Pattern.compile("^[A-Z0-9]{4,10}$");
     private static final String TAG_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     private final UserRepository userRepository;
@@ -90,7 +90,7 @@ public class UserHandleService {
         }
         String normalized = tag.trim().toUpperCase(Locale.ROOT);
         if (!TAG_PATTERN.matcher(normalized).matches()) {
-            throw new DomainException("El tag debe tener 4 caracteres alfanumericos");
+            throw new DomainException("El tag debe tener entre 4 y 10 caracteres alfanumericos");
         }
         return normalized;
     }

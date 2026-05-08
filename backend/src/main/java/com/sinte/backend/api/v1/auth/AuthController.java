@@ -10,7 +10,6 @@ import com.sinte.backend.config.security.SecurityUtils;
 import com.sinte.backend.service.AuthService;
 import com.sinte.backend.service.UserPositionService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -82,7 +81,7 @@ public class AuthController {
 
     public record PositionAssignmentRequest(
             @NotBlank String positionCode,
-            @Min(1) short priority
+            int priority
     ) {
     }
 }
