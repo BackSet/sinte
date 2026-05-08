@@ -2,9 +2,12 @@
 -- Adds shirt_number, description, is_primary, nickname, rol, attendance_open
 -- Creates match_pairs table with FK constraints
 
--- 1. users: add shirt_number (migrate from nickname_tag)
-ALTER TABLE users ADD COLUMN shirt_number INTEGER NOT NULL DEFAULT 0;
+-- 1. users: add shirt_number (nullable first, backfill, then NOT NULL)
+ALTER TABLE users ADD COLUMN shirt_number INTEGER;
 UPDATE users SET shirt_number = CAST(nickname_tag AS INTEGER) WHERE nickname_tag IS NOT NULL AND nickname_tag ~ '^[0-9]+$';
+UPDATE users SET shirt_number = 0 WHERE shirt_number IS NULL;
+ALTER TABLE users ALTER COLUMN shirt_number SET NOT NULL;
+ALTER TABLE users ALTER COLUMN shirt_number SET DEFAULT 0;
 CREATE UNIQUE INDEX idx_users_nickname_shirt ON users(nickname, shirt_number);
 
 -- 2. positions: add description
