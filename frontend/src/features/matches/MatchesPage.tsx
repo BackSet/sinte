@@ -206,6 +206,12 @@ export function MatchesPage() {
   const [guestShirtNumber, setGuestShirtNumber] = useState<number | undefined>()
   const [guestPositionCodes, setGuestPositionCodes] = useState<string[]>([])
   const [matchForm, setMatchForm] = useState(emptyMatchForm())
+  const [manualPairMode, setManualPairMode] = useState(false)
+  const [manualPairA, setManualPairA] = useState<string | null>(null)
+  const [manualPairB, setManualPairB] = useState<string | null>(null)
+  const [manualPairPosition, setManualPairPosition] = useState<string>('')
+  const [manualPairPlayerTypeA, setManualPairPlayerTypeA] = useState<'user' | 'guest'>('user')
+  const [manualPairPlayerTypeB, setManualPairPlayerTypeB] = useState<'user' | 'guest'>('user')
 
   const matchesQuery = useQuery({
     queryKey: ['matches'],
@@ -374,6 +380,40 @@ export function MatchesPage() {
       queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudieron resetear las parejas')),
+  })
+
+  const createManualPairMutation = useMutation({
+    mutationFn: async () => {
+      const isGuestA = manualPairPlayerTypeA === 'guest'
+      const isGuestB = manualPairPlayerTypeB === 'guest'
+      await apiClient.post<PairingPreviewResponse>(`/api/v1/matches/${selectedMatch!.id}/pairs/manual`, {
+        playerAId: isGuestA ? null : manualPairA,
+        playerBId: isGuestB ? null : manualPairB,
+        guestPlayerAId: isGuestA ? manualPairA : null,
+        guestPlayerBId: isGuestB ? manualPairB : null,
+        positionCode: manualPairPosition,
+      })
+    },
+    onSuccess: () => {
+      addToast('success', 'Pareja creada')
+      setManualPairMode(false)
+      setManualPairA(null)
+      setManualPairB(null)
+      setManualPairPosition('')
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo crear la pareja')),
+  })
+
+  const deletePairMutation = useMutation({
+    mutationFn: async (pairId: string) => {
+      await apiClient.delete(`/api/v1/matches/${selectedMatch!.id}/pairs/${pairId}`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Pareja eliminada')
+      queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar la pareja')),
   })
 
   const toggleGuestPosition = (code: string) => {
@@ -720,6 +760,19 @@ export function MatchesPage() {
                     {generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}
                   </button>
                   <button
+                    className={`ui-button ${manualPairMode ? 'ui-button-primary' : 'ui-button-muted'}`}
+                    onClick={() => {
+                      setManualPairMode(!manualPairMode)
+                      if (!manualPairMode) {
+                        setManualPairA(null)
+                        setManualPairB(null)
+                        setManualPairPosition('')
+                      }
+                    }}
+                  >
+                    {manualPairMode ? 'Cancelar' : 'Emparejamiento manual'}
+                  </button>
+                  <button
                     className="ui-button-primary"
                     onClick={() => drawTeamsMutation.mutate()}
                     disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
@@ -736,6 +789,71 @@ export function MatchesPage() {
                     </button>
                   )}
                 </div>
+
+                {manualPairMode && (
+                  <div className="rounded-lg border border-[var(--accent)] bg-[var(--accent)]/5 p-4">
+                    <h4 className="mb-3 text-sm font-semibold">Crear pareja manualmente</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                      <div>
+                        <label className="ui-form-label">Tipo Jugador A</label>
+                        <select className="ui-input" value={manualPairPlayerTypeA} onChange={(e) => { setManualPairPlayerTypeA(e.target.value as 'user' | 'guest'); setManualPairA(null) }}>
+                          <option value="user">Jugador</option>
+                          <option value="guest">Invitado</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="ui-form-label">Jugador A</label>
+                        <select className="ui-input" value={manualPairA ?? ''} onChange={(e) => setManualPairA(e.target.value || null)}>
+                          <option value="">Seleccionar...</option>
+                          {(manualPairPlayerTypeA === 'user' ? (confirmedQuery.data ?? []) : (guestsQuery.data?.filter(g => g.status === 'YES') ?? []))
+                            .map((p: any) => (
+                              <option key={p.userId ?? p.id} value={p.userId ?? p.id}>
+                                {p.fullName}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="ui-form-label">Tipo Jugador B</label>
+                        <select className="ui-input" value={manualPairPlayerTypeB} onChange={(e) => { setManualPairPlayerTypeB(e.target.value as 'user' | 'guest'); setManualPairB(null) }}>
+                          <option value="user">Jugador</option>
+                          <option value="guest">Invitado</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="ui-form-label">Jugador B</label>
+                        <select className="ui-input" value={manualPairB ?? ''} onChange={(e) => setManualPairB(e.target.value || null)}>
+                          <option value="">Seleccionar...</option>
+                          {(manualPairPlayerTypeB === 'user' ? (confirmedQuery.data ?? []) : (guestsQuery.data?.filter(g => g.status === 'YES') ?? []))
+                            .map((p: any) => (
+                              <option key={p.userId ?? p.id} value={p.userId ?? p.id}>
+                                {p.fullName}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="ui-form-label">Posicion</label>
+                        <select className="ui-input" value={manualPairPosition} onChange={(e) => setManualPairPosition(e.target.value)}>
+                          <option value="">Seleccionar posicion...</option>
+                          {PLAYER_POSITION_OPTIONS.map((pos) => (
+                            <option key={pos.value} value={pos.value}>{pos.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="ui-form-label">&nbsp;</label>
+                        <button
+                          className="ui-button-primary w-full"
+                          onClick={() => createManualPairMutation.mutate()}
+                          disabled={createManualPairMutation.isPending || !manualPairA || !manualPairB || !manualPairPosition}
+                        >
+                          {createManualPairMutation.isPending ? 'Creando...' : 'Crear pareja'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {(generatePairsMutation.isError || drawTeamsMutation.isError || resetPairsMutation.isError) && (
@@ -759,6 +877,7 @@ export function MatchesPage() {
                             playerB={pair.playerB}
                             positionCode={pair.positionCode}
                             pairNumber={i + 1}
+                            onDelete={() => deletePairMutation.mutate(pair.id)}
                           />
                         ))}
                       </div>

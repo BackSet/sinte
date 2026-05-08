@@ -14,9 +14,11 @@ import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.repository.GuestPlayerRepository;
 import com.sinte.backend.repository.MatchAttendanceRepository;
 import com.sinte.backend.repository.MatchPairRepository;
+import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.MatchTeamPlayerRepository;
 import com.sinte.backend.repository.MatchTeamRepository;
 import com.sinte.backend.repository.UserPositionRepository;
+import com.sinte.backend.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +39,8 @@ public class MatchPairingService {
     private final MatchPairRepository matchPairRepository;
     private final MatchTeamRepository matchTeamRepository;
     private final MatchTeamPlayerRepository matchTeamPlayerRepository;
+    private final MatchRepository matchRepository;
+    private final UserRepository userRepository;
 
     public MatchPairingService(
             MatchAttendanceRepository matchAttendanceRepository,
@@ -45,7 +49,9 @@ public class MatchPairingService {
             GuestPlayerPositionRepository guestPlayerPositionRepository,
             MatchPairRepository matchPairRepository,
             MatchTeamRepository matchTeamRepository,
-            MatchTeamPlayerRepository matchTeamPlayerRepository
+            MatchTeamPlayerRepository matchTeamPlayerRepository,
+            MatchRepository matchRepository,
+            UserRepository userRepository
     ) {
         this.matchAttendanceRepository = matchAttendanceRepository;
         this.guestPlayerRepository = guestPlayerRepository;
@@ -54,6 +60,8 @@ public class MatchPairingService {
         this.matchPairRepository = matchPairRepository;
         this.matchTeamRepository = matchTeamRepository;
         this.matchTeamPlayerRepository = matchTeamPlayerRepository;
+        this.matchRepository = matchRepository;
+        this.userRepository = userRepository;
     }
 
     public record PairingResult(
@@ -294,6 +302,39 @@ public class MatchPairingService {
         matchPairRepository.deleteByMatchId(matchId);
         matchTeamPlayerRepository.deleteByMatchId(matchId);
         matchTeamRepository.deleteByMatchId(matchId);
+    }
+
+    @Transactional
+    public PairingResult createManualPair(UUID matchId, UUID playerAId, UUID playerBId, UUID guestPlayerAId, UUID guestPlayerBId, String positionCode) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new DomainException("Partido no encontrado"));
+
+        User playerA = playerAId != null ? userRepository.findById(playerAId).orElse(null) : null;
+        User playerB = playerBId != null ? userRepository.findById(playerBId).orElse(null) : null;
+        GuestPlayer guestA = guestPlayerAId != null ? guestPlayerRepository.findById(guestPlayerAId).orElse(null) : null;
+        GuestPlayer guestB = guestPlayerBId != null ? guestPlayerRepository.findById(guestPlayerBId).orElse(null) : null;
+
+        if (playerA == null && guestA == null) {
+            throw new DomainException("Debe especificar al menos un jugador A");
+        }
+        if (playerB == null && guestB == null) {
+            throw new DomainException("Debe especificar al menos un jugador B");
+        }
+
+        MatchPair pair = new MatchPair(match, playerA, playerB, guestA, guestB, positionCode);
+        matchPairRepository.save(pair);
+
+        return previewPairs(matchId);
+    }
+
+    @Transactional
+    public void deletePair(UUID matchId, UUID pairId) {
+        MatchPair pair = matchPairRepository.findById(pairId)
+                .orElseThrow(() -> new DomainException("Pareja no encontrada"));
+        if (!pair.getMatch().getId().equals(matchId)) {
+            throw new DomainException("La pareja no pertenece a este partido");
+        }
+        matchPairRepository.delete(pair);
     }
 
     private MatchMatchups loadMatchups(UUID matchId) {

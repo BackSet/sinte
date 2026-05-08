@@ -1,4 +1,5 @@
 import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
+import { Icon } from './Icon'
 
 const POSITION_COLORS: Record<string, string> = {
   GOALKEEPER: '#3B82F6',
@@ -22,9 +23,10 @@ export type PairBadgeProps = {
   playerB: { fullName: string; playerHandle?: string | null }
   positionCode: string
   pairNumber?: number
+  onDelete?: () => void
 }
 
-export function PairBadge({ playerA, playerB, positionCode, pairNumber }: PairBadgeProps) {
+export function PairBadge({ playerA, playerB, positionCode, pairNumber, onDelete }: PairBadgeProps) {
   const color = POSITION_COLORS[positionCode] ?? '#6B7280'
   const positionLabel = POSITION_LABELS[positionCode] ?? positionCode
 
@@ -34,9 +36,20 @@ export function PairBadge({ playerA, playerB, positionCode, pairNumber }: PairBa
         <span className="text-xs font-medium" style={{ color }}>
           {positionLabel}
         </span>
-        {pairNumber !== undefined && (
-          <span className="ui-text-muted text-xs">#{pairNumber}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {pairNumber !== undefined && (
+            <span className="ui-text-muted text-xs">#{pairNumber}</span>
+          )}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="text-[var(--danger)] hover:text-[var(--danger)]/80"
+              title="Eliminar pareja"
+            >
+              <Icon name="trash" size="sm" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <PlayerPill name={playerA.fullName} handle={playerA.playerHandle} />

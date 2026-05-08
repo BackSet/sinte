@@ -201,6 +201,30 @@ public class MatchesController {
         return ResponseEntity.ok(toPairingPreviewResponse(result));
     }
 
+    @PostMapping("/{matchId}/pairs/manual")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<PairingPreviewResponse> createManualPair(
+            @PathVariable UUID matchId,
+            @Valid @RequestBody ManualPairRequest request
+    ) {
+        MatchPairingService.PairingResult result = pairingService.createManualPair(
+                matchId,
+                request.playerAId(),
+                request.playerBId(),
+                request.guestPlayerAId(),
+                request.guestPlayerBId(),
+                request.positionCode()
+        );
+        return ResponseEntity.ok(toPairingPreviewResponse(result));
+    }
+
+    @DeleteMapping("/{matchId}/pairs/{pairId}")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> deletePair(@PathVariable UUID matchId, @PathVariable UUID pairId) {
+        pairingService.deletePair(matchId, pairId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{matchId}/pairs/draw")
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<Void> drawAndAssignTeams(@PathVariable UUID matchId) {
@@ -438,6 +462,15 @@ public class MatchesController {
             String primaryPositionCode,
             String secondaryPositionCode,
             boolean isPrimary
+    ) {
+    }
+
+    public record ManualPairRequest(
+            UUID playerAId,
+            UUID playerBId,
+            UUID guestPlayerAId,
+            UUID guestPlayerBId,
+            @NotBlank String positionCode
     ) {
     }
 }
