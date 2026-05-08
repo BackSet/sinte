@@ -16,6 +16,7 @@ type ModalProps = {
 
 export function Modal({ open, onClose, size = 'md', title, subtitle, children, tabs }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const headingId = `modal-title-${title.toLowerCase().replace(/\s+/g, '-')}`
 
   useEffect(() => {
     if (!open) return
@@ -48,12 +49,12 @@ export function Modal({ open, onClose, size = 'md', title, subtitle, children, t
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby={headingId}
     >
       <div className={`ui-modal ui-modal--${size}`}>
         <div className="ui-modal-header">
           <div>
-            <p className="ui-modal-title">{title}</p>
+            <p id={headingId} className="ui-modal-title">{title}</p>
             {subtitle && <p className="ui-modal-subtitle">{subtitle}</p>}
           </div>
           <button className="ui-modal-close" onClick={onClose} aria-label="Cerrar">

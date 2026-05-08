@@ -45,9 +45,9 @@ export function DashboardLayout() {
   })
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 md:grid-cols-[250px_1fr]">
-        <aside className="hidden border-r p-4 md:block" aria-label="Navegacion principal">
+    <div className="min-h-screen bg-[var(--bg-app)]">
+      <div className="mx-auto grid min-h-screen max-w-[1360px] grid-cols-1 md:grid-cols-[272px_1fr]">
+        <aside className="hidden border-r border-[var(--border-soft)] bg-[var(--bg-panel)] p-5 md:block" aria-label="Navegacion principal">
           <Link className="mb-6 flex items-center gap-2 text-lg font-bold tracking-tight" to="/dashboard">
             <Icon name="dashboard" size="lg" />
             SINTE
@@ -107,13 +107,15 @@ export function DashboardLayout() {
           </nav>
         </aside>
 
-        <main className="px-3 pb-24 pt-3 sm:px-4 md:px-6 md:pb-6 md:pt-6">
+        <main className="ui-page-shell pt-3 md:pt-6">
           <h1 className="sr-only">Panel principal SINTE</h1>
-          <header className="ui-card mb-4 flex items-center justify-between px-3 py-3 sm:mb-6 sm:px-4">
+          <header className="ui-card mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:mb-6 sm:px-4">
             <div>
               <p className="ui-text-muted text-xs">Sesion activa</p>
               <p className="text-sm font-medium">
-                {user?.fullName ?? 'Usuario'}
+                <Link to="/profile" className="hover:underline">
+                  {user?.fullName ?? 'Usuario'}
+                </Link>
                 <span className="ui-text-muted ml-2 hidden text-xs sm:inline">
                   ({user?.roles.join(', ') ?? 'sin rol'})
                 </span>
@@ -124,7 +126,7 @@ export function DashboardLayout() {
               <button className="ui-button-muted" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
                 <span className="inline-flex items-center gap-2">
                   <Icon name="logout" size="sm" />
-                  <span className="hidden sm:inline">{logoutMutation.isPending ? 'Saliendo...' : 'Cerrar sesion'}</span>
+                  <span>{logoutMutation.isPending ? 'Saliendo...' : 'Cerrar sesion'}</span>
                 </span>
               </button>
             </div>

@@ -194,7 +194,7 @@ export function UsersPage() {
                 label: '',
                 className: 'text-right',
                 render: (user) => (
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
                     <button className="ui-button-muted" onClick={() => openDetail(user)}>Ver</button>
                     <button className="ui-button-muted" onClick={() => openPositions(user)}>Posiciones</button>
                     <button className="ui-button-muted" onClick={() => handleToggleActive(user)}>
@@ -216,7 +216,7 @@ export function UsersPage() {
                 <p className="ui-text-muted">Telefono: {user.phone}</p>
                 <p className="ui-text-muted">Codigo: {user.playerHandle ?? '-'}</p>
                 <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button className="ui-button-muted" onClick={() => openDetail(user)}>Ver</button>
                   <button className="ui-button-muted" onClick={() => openPositions(user)}>Posiciones</button>
                   <button className="ui-button-muted" onClick={() => handleToggleActive(user)}>
@@ -237,7 +237,7 @@ export function UsersPage() {
         title="Nuevo usuario"
         subtitle="Alta rapida de jugadores y staff"
       >
-        <FormField label="Nombre completo">
+        <FormField label="Nombre completo" required>
           <input
             className="ui-input"
             placeholder="Nombre completo"
@@ -247,8 +247,8 @@ export function UsersPage() {
           />
         </FormField>
 
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Correo">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField label="Correo" required>
             <input
               className="ui-input"
               type="email"
@@ -258,7 +258,7 @@ export function UsersPage() {
               required
             />
           </FormField>
-          <FormField label="Telefono">
+          <FormField label="Telefono" required>
             <input
               className="ui-input"
               placeholder="0991234567"
@@ -290,7 +290,7 @@ export function UsersPage() {
           />
         </FormField>
 
-        <FormField label="Contrasena temporal">
+        <FormField label="Contrasena temporal" required>
           <input
             className="ui-input"
             type="password"

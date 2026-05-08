@@ -11,6 +11,7 @@ public record UserMeResponse(
         String nickname,
         String nicknameTag,
         String playerHandle,
+        int shirtNumber,
         List<String> roles
 ) {
 }

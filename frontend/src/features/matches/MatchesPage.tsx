@@ -334,6 +334,7 @@ export function MatchesPage() {
       await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/guest-players`, {
         fullName: guestFullName.trim(),
         nickname: guestNickname.trim() || undefined,
+        shirtNumber: guestShirtNumber,
         positionCodes: guestPositionCodes.length > 0 ? guestPositionCodes : undefined,
       })
     },
@@ -433,6 +434,7 @@ export function MatchesPage() {
 
   useEffect(() => {
     if (!teamsQuery.data) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftTeams(
       teamsQuery.data.map((team) => ({
         teamNumber: team.teamNumber,
@@ -519,7 +521,7 @@ export function MatchesPage() {
         description={isManager ? 'Visualiza y gestiona convocatorias activas' : 'Revisa partidos y abre su detalle'}
         action={
           <select
-            className="ui-input min-w-44"
+            className="ui-input min-w-44 sm:min-w-52"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'SCHEDULED' | 'CANCELLED')}
             aria-label="Filtrar partidos por estado"
@@ -620,12 +622,12 @@ export function MatchesPage() {
           title="Nuevo partido"
           subtitle="Alternativa rapida a una serie"
         >
-          <div className="ui-detail-section">
+            <div className="ui-detail-section">
             <p className="ui-detail-section-title">Datos del partido</p>
-            <FormField label="Titulo">
+            <FormField label="Titulo" required>
               <input className="ui-input" placeholder="Ej: Partido sabado" value={matchForm.title} onChange={(e) => setMatchForm({ ...matchForm, title: e.target.value })} required />
             </FormField>
-            <FormField label="Fecha y hora">
+            <FormField label="Fecha y hora" required>
               <DateTimeField type="datetime-local" value={matchForm.startsAt} onChange={(e) => setMatchForm({ ...matchForm, startsAt: e.target.value })} required />
             </FormField>
             <FormField label="Descripcion (opcional)">
@@ -637,17 +639,17 @@ export function MatchesPage() {
 
           <div className="ui-detail-section">
             <p className="ui-detail-section-title">Configuracion de plantilla</p>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Ubicacion">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField label="Ubicacion" required>
                 <input className="ui-input" placeholder="Cancha principal" value={matchForm.configLocation} onChange={(e) => setMatchForm({ ...matchForm, configLocation: e.target.value })} required />
               </FormField>
-              <FormField label="Plantilla objetivo">
+              <FormField label="Plantilla objetivo" required>
                 <input className="ui-input" type="number" min={1} value={matchForm.configTargetPlayers} onChange={(e) => setMatchForm({ ...matchForm, configTargetPlayers: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} required />
               </FormField>
-              <FormField label="Duracion (minutos)">
+              <FormField label="Duracion (minutos)" required>
                 <input className="ui-input" type="number" min={1} value={matchForm.configDurationMinutes} onChange={(e) => setMatchForm({ ...matchForm, configDurationMinutes: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} required />
               </FormField>
-              <FormField label="Zona horaria">
+              <FormField label="Zona horaria" required>
                 <select className="ui-input" value={matchForm.configTimezone} onChange={(e) => setMatchForm({ ...matchForm, configTimezone: e.target.value })} required>
                   {timezoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
                 </select>
@@ -700,8 +702,8 @@ export function MatchesPage() {
                     <p className="ui-detail-section-title">Titulares ({rosterQuery.data.roster.length} / {selectedMatch.targetPlayers ?? '-'})</p>
                     {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted text-sm">Aun no hay titulares.</p>}
                     <div className="space-y-1">
-                      {rosterQuery.data.roster.map((p) => {
-                        const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                      {rosterQuery.data.roster.map((p, index) => {
+                        const key = p.userId ?? p.guestPlayerId ?? `roster-${index}`
                         return (
                           <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
                             <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
@@ -718,8 +720,8 @@ export function MatchesPage() {
                     <div className="ui-detail-section">
                       <p className="ui-detail-section-title">Lista de espera ({rosterQuery.data.waitlist.length})</p>
                       <div className="space-y-1">
-                        {rosterQuery.data.waitlist.map((p) => {
-                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                        {rosterQuery.data.waitlist.map((p, index) => {
+                          const key = p.userId ?? p.guestPlayerId ?? `waitlist-${index}`
                           return (
                             <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
                               <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
@@ -735,8 +737,8 @@ export function MatchesPage() {
                     <div className="ui-detail-section">
                       <p className="ui-detail-section-title">Cancelaron ({rosterQuery.data.cancelled.length})</p>
                       <div className="space-y-1">
-                        {rosterQuery.data.cancelled.map((p) => {
-                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                        {rosterQuery.data.cancelled.map((p, index) => {
+                          const key = p.userId ?? p.guestPlayerId ?? `cancelled-${index}`
                           return <div key={key} className="rounded-md border px-3 py-2 ui-text-muted">{p.fullName}{p.guestPlayerId ? ' — Invitado' : ''}</div>
                         })}
                       </div>
@@ -747,8 +749,8 @@ export function MatchesPage() {
                 <div className="ui-detail-section">
                   <p className="ui-detail-section-title">Confirmados ({confirmedQuery.data.length} / {selectedMatch.targetPlayers ?? '-'})</p>
                   <div className="space-y-1">
-                    {confirmedQuery.data.map((player) => {
-                      const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                    {confirmedQuery.data.map((player, index) => {
+                      const key = player.userId ?? player.guestPlayerId ?? `confirmed-${index}`
                       return <div key={key} className="rounded-md border px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' — Invitado' : ''}</div>
                     })}
                   </div>
@@ -826,8 +828,8 @@ export function MatchesPage() {
                     <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-bg)] p-3">
                       <p className="mb-2 text-sm font-medium">Jugadores sin pareja</p>
                       <div className="flex flex-wrap gap-2">
-                        {pairingQuery.data.unpaired.map((p) => {
-                          const key = p.userId ?? p.guestPlayerId ?? Math.random().toString()
+                        {pairingQuery.data.unpaired.map((p, index) => {
+                          const key = p.userId ?? p.guestPlayerId ?? `unpaired-${index}`
                           return (
                             <span key={key} className="rounded-md border px-2 py-1 text-xs">
                               {p.fullName}
@@ -865,8 +867,8 @@ export function MatchesPage() {
               <div className="ui-muted-surface rounded-lg p-3">
                 <p className="text-sm font-medium">Sin asignar ({unassignedPlayers.length})</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {unassignedPlayers.map((player) => {
-                    const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                  {unassignedPlayers.map((player, index) => {
+                    const key = player.userId ?? player.guestPlayerId ?? `unassigned-${index}`
                     return <span key={key} className="rounded-md border px-2 py-1 text-xs">{player.fullName}{player.guestPlayerId ? ' (Inv.)' : ''}</span>
                   })}
                   {unassignedPlayers.length === 0 && <span className="ui-text-muted text-xs">Todos asignados.</span>}
@@ -881,8 +883,8 @@ export function MatchesPage() {
                     } />
                   </div>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {(confirmedQuery.data ?? []).map((player) => {
-                      const key = player.userId ?? player.guestPlayerId ?? Math.random().toString()
+                    {(confirmedQuery.data ?? []).map((player, index) => {
+                      const key = player.userId ?? player.guestPlayerId ?? `team-${team.teamNumber}-${index}`
                       const isGuest = Boolean(player.guestPlayerId)
                       const playerId = isGuest ? player.guestPlayerId : player.userId
                       const isInTeam = isGuest ? team.guestPlayerIds.includes(playerId!) : team.playerIds.includes(playerId!)
@@ -902,23 +904,23 @@ export function MatchesPage() {
           {/* Guests Tab */}
           {detailTab === 'guests' && isManager && (
             <div className="space-y-4">
-              <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => {
+              <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" onSubmit={(e) => {
                 e.preventDefault()
                 if (guestFullName.trim()) createGuestMutation.mutate()
               }}>
-                <div className="min-w-48 flex-1">
+                <div className="sm:col-span-1 xl:col-span-1">
                   <label className="ui-form-label">Nombre del invitado</label>
                   <input className="ui-input" placeholder="Nombre completo" value={guestFullName} onChange={(e) => setGuestFullName(e.target.value)} required />
                 </div>
-                <div className="min-w-32">
+                <div className="sm:col-span-1 xl:col-span-1">
                   <label className="ui-form-label">Apodo (opcional)</label>
                   <input className="ui-input" placeholder="Apodo" value={guestNickname} onChange={(e) => setGuestNickname(e.target.value)} />
                 </div>
-                <div className="w-24">
+                <div className="sm:col-span-1 xl:col-span-1">
                   <label className="ui-form-label">Camiseta (opcional)</label>
                   <input className="ui-input" type="number" placeholder="Nro" min={1} value={guestShirtNumber || ''} onChange={(e) => setGuestShirtNumber(e.target.value ? Number(e.target.value) : undefined)} />
                 </div>
-                <div className="flex-1">
+                <div className="sm:col-span-2 xl:col-span-1">
                   <label className="ui-form-label">Posiciones (opcional)</label>
                   <div className="flex flex-wrap gap-1">
                     {PLAYER_POSITION_OPTIONS.map((opt) => (
@@ -928,7 +930,7 @@ export function MatchesPage() {
                     ))}
                   </div>
                 </div>
-                <button className="ui-button" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
+                <button className="ui-button sm:col-span-2 xl:col-span-4" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
                   {createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}
                 </button>
               </form>

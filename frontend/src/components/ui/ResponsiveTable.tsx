@@ -36,19 +36,19 @@ export function ResponsiveTable<T>({
     <>
       <div className="space-y-3 md:hidden">
         {data.map((item) => (
-          <article key={rowKey(item)} className="ui-muted-surface p-3">
+          <article key={rowKey(item)} className="ui-muted-surface p-3.5">
             {renderMobileCard(item)}
           </article>
         ))}
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-left text-sm">
+        <table className="w-full min-w-[740px] text-left text-sm">
           <caption className="sr-only">Tabla de resultados</caption>
           <thead>
             <tr className="border-b border-[var(--border-soft)] text-[var(--text-secondary)]">
               {columns.map((column) => (
-                <th key={column.key} scope="col" className={`py-2.5 pr-4 font-medium ${column.className ?? ''}`}>
+                <th key={column.key} scope="col" className={`py-3 pr-4 font-medium ${column.className ?? ''}`}>
                   {column.label}
                 </th>
               ))}
@@ -58,7 +58,7 @@ export function ResponsiveTable<T>({
             {data.map((item) => (
               <tr key={rowKey(item)} className="border-b border-[var(--border-soft)] align-top transition-colors hover:bg-[var(--bg-hover)]">
                 {columns.map((column) => (
-                  <td key={column.key} className={`py-2.5 pr-4 ${column.className ?? ''}`}>
+                  <td key={column.key} className={`py-3 pr-4 ${column.className ?? ''}`}>
                     {column.render(item)}
                   </td>
                 ))}

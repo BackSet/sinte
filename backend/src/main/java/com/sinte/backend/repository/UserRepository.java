@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmailIgnoreCase(String email);
 
+    Optional<User> findByPhone(String phone);
+
     @Query("""
            SELECT u
            FROM User u

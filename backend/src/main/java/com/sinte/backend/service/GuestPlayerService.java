@@ -34,7 +34,14 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer createGuestPlayer(UUID matchId, UUID createdByUserId, String fullName, String nickname, List<String> positionCodes) {
+    public GuestPlayer createGuestPlayer(
+            UUID matchId,
+            UUID createdByUserId,
+            String fullName,
+            String nickname,
+            Integer shirtNumber,
+            List<String> positionCodes
+    ) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new DomainException("Partido no encontrado"));
         if (match.getStatus() == MatchStatus.FINISHED) {
@@ -49,6 +56,7 @@ public class GuestPlayerService {
         }
 
         GuestPlayer guest = new GuestPlayer(match, creator, fullName.trim(), nickname != null ? nickname.trim() : null);
+        guest.setShirtNumber(shirtNumber);
         GuestPlayer saved = guestPlayerRepository.save(guest);
 
         if (positionCodes != null && !positionCodes.isEmpty()) {
@@ -110,6 +118,20 @@ public class GuestPlayerService {
             }
         }
         guest.cancel();
+        return guestPlayerRepository.save(guest);
+    }
+
+    @Transactional
+    public GuestPlayer resetGuestToPending(UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
+                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+        if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
+            boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
+            if (!isAdmin) {
+                throw new DomainException("Solo el creador o un ADMIN puede resetear un invitado");
+            }
+        }
+        guest.resetToPending();
         return guestPlayerRepository.save(guest);
     }
 

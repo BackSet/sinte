@@ -39,7 +39,7 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
   )
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-[var(--bg-panel)]/95 backdrop-blur md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-soft)] bg-[var(--bg-panel)]/95 backdrop-blur md:hidden">
       {openMore && (
         <div id="mobile-more-menu" className="ui-card mx-2 mb-2 p-2" role="menu" aria-label="Mas accesos">
           <div className="px-1 pb-2">
@@ -69,7 +69,7 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `rounded-lg px-1 py-2.5 text-center text-[11px] font-medium ${
+              `rounded-xl px-1 py-2.5 text-center text-[11px] font-medium ${
                 isActive ? 'ui-nav-link-active' : 'ui-text-muted'
               }`
             }

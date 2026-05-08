@@ -3,6 +3,7 @@ package com.sinte.backend.service;
 import com.sinte.backend.api.v1.auth.dto.AuthResponse;
 import com.sinte.backend.api.v1.auth.dto.LoginRequest;
 import com.sinte.backend.api.v1.auth.dto.RegisterRequest;
+import com.sinte.backend.api.v1.auth.dto.UpdateProfileRequest;
 import com.sinte.backend.api.v1.auth.dto.UserMeResponse;
 import com.sinte.backend.config.security.JwtProperties;
 import com.sinte.backend.config.security.JwtService;
@@ -145,8 +146,38 @@ public class AuthService {
                 user.getNickname(),
                 user.getNicknameTag(),
                 userHandleService.buildHandle(user.getNickname(), user.getNicknameTag()),
+                user.getShirtNumber(),
                 roles
         );
+    }
+
+    @Transactional
+    public UserMeResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new DomainException("Usuario no encontrado"));
+
+        String normalizedEmail = userHandleService.normalizeEmail(request.email());
+        if (!user.getEmail().equalsIgnoreCase(normalizedEmail)) {
+            if (userRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
+                throw new DomainException("El correo ya esta registrado");
+            }
+            user.setEmail(normalizedEmail);
+        }
+
+        if (!user.getPhone().equals(request.phone())) {
+            if (userRepository.findByPhone(request.phone()).isPresent()) {
+                throw new DomainException("El telefono ya esta registrado");
+            }
+            user.setPhone(request.phone());
+        }
+
+        user.setFullName(request.fullName());
+        user.setNickname(request.nickname());
+        user.setShirtNumber(request.shirtNumber());
+        userHandleService.ensureHandle(user, user.getId());
+
+        userRepository.save(user);
+        return me(userId);
     }
 
     private AuthResponse buildAuthResponse(User user) {

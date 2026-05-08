@@ -55,16 +55,16 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-4">
-      <section className="ui-card p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{canManage ? 'Inicio de gestion' : 'Inicio'}</h1>
+    <div className="space-y-5">
+      <section className="ui-card p-5 sm:p-6">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{canManage ? 'Inicio de gestion' : 'Inicio'}</h1>
         <p className="ui-text-muted mt-1">
           Bienvenido, <span className="font-medium text-[var(--text-primary)]">{user?.fullName ?? 'usuario'}</span>
         </p>
       </section>
 
       {canManage && stats.length > 0 && (
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {stats.map((stat) => (
             <article key={stat.label} className="ui-card p-4">
               <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export function DashboardPage() {
         </section>
       )}
 
-      <section className="ui-card p-5">
+      <section className="ui-card p-5 sm:p-6">
         <h2 className="mb-3 text-base font-semibold tracking-tight">
           {canManage ? 'Acciones rapidas' : 'Acciones rapidas'}
         </h2>
@@ -102,7 +102,7 @@ export function DashboardPage() {
             <Link
               key={action.to}
               to={action.to}
-              className="ui-muted-surface flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-[var(--bg-hover)]"
+              className="ui-muted-surface flex items-center gap-3 rounded-xl p-3 transition-colors hover:bg-[var(--bg-hover)]"
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-panel)]">
                 <Icon name={action.icon} size="sm" />

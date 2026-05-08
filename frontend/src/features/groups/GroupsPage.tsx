@@ -176,7 +176,7 @@ export function GroupsPage() {
                 label: '',
                 className: 'text-right',
                 render: (group) => (
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
                     <button className="ui-button-muted" onClick={() => openMembers(group)}>
                       Ver miembros
                     </button>
@@ -223,7 +223,7 @@ export function GroupsPage() {
         title="Nuevo grupo"
         subtitle="Organiza jugadores para convocatorias y avisos"
       >
-        <FormField label="Nombre del grupo">
+        <FormField label="Nombre del grupo" required>
           <input
             className="ui-input"
             placeholder="Ej: Titulares, Suplentes"
@@ -283,7 +283,7 @@ export function GroupsPage() {
                 isAdding={addMemberMutation.isPending}
               />
             ) : (
-              <form className="flex gap-2" onSubmit={handleManualSubmit}>
+              <form className="flex flex-col gap-2 sm:flex-row" onSubmit={handleManualSubmit}>
                 <input
                   className="ui-input"
                   placeholder="nick#TAG4 (ej: backset#TAKE)"

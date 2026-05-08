@@ -16,6 +16,7 @@ import { AdminEmailQueuePage } from '../features/admin/AdminEmailQueuePage'
 import { GroupsPage } from '../features/groups/GroupsPage'
 import { MyGroupsPage } from '../features/groups/MyGroupsPage'
 import { ConfigsPage } from '../features/configs/ConfigsPage'
+import { ProfilePage } from '../features/profile/ProfilePage'
 
 const router = createBrowserRouter([
   {
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
           },
           { path: '/attendance', element: <AttendancePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
+          { path: '/profile', element: <ProfilePage /> },
           {
             element: <RequireRole allowed={['ADMIN']} />,
             children: [{ path: '/admin/email-queue', element: <AdminEmailQueuePage /> }],

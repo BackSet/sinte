@@ -170,7 +170,7 @@ export function SeriesPage() {
         location: form.configLocation || null,
         targetPlayers: form.configTargetPlayers,
         durationMinutes: form.configDurationMinutes,
-        timezone: form.configTimezone,
+        timezone: form.timezone,
       })
       await apiClient.post('/api/v1/series', {
         configId: configResponse.data.id,
@@ -426,11 +426,6 @@ export function SeriesPage() {
             </FormField>
             <FormField label="Duracion (minutos)">
               <input className="ui-input" type="number" min={1} value={form.configDurationMinutes} onChange={(e) => setForm({ ...form, configDurationMinutes: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} required />
-            </FormField>
-            <FormField label="Zona horaria de config">
-              <select className="ui-input" value={form.configTimezone} onChange={(e) => setForm({ ...form, configTimezone: e.target.value })} required>
-                {timezoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-              </select>
             </FormField>
           </div>
         </div>

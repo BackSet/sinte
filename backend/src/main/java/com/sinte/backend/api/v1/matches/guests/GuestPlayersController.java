@@ -39,7 +39,7 @@ public class GuestPlayersController {
     ) {
         UUID userId = SecurityUtils.currentUserId();
         GuestPlayer guest = guestPlayerService.createGuestPlayer(
-                matchId, userId, request.fullName(), request.nickname(), request.positionCodes()
+                matchId, userId, request.fullName(), request.nickname(), request.shirtNumber(), request.positionCodes()
         );
         return ResponseEntity.ok(toResponse(guest));
     }
@@ -64,6 +64,7 @@ public class GuestPlayersController {
             case "YES" -> guest = guestPlayerService.confirmGuest(guestPlayerId, userId);
             case "NO" -> guest = guestPlayerService.declineGuest(guestPlayerId, userId);
             case "CANCELLED" -> guest = guestPlayerService.cancelGuest(guestPlayerId, userId);
+            case "PENDING" -> guest = guestPlayerService.resetGuestToPending(guestPlayerId, userId);
             default -> throw new IllegalArgumentException("Estado no valido: " + request.status());
         }
         return ResponseEntity.ok(toResponse(guest));
@@ -96,6 +97,7 @@ public class GuestPlayersController {
     public record CreateGuestPlayerRequest(
             @NotBlank @Size(max = 120) String fullName,
             String nickname,
+            Integer shirtNumber,
             List<String> positionCodes
     ) {
     }
