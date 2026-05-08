@@ -16,7 +16,6 @@ import com.sinte.backend.repository.MatchAttendanceRepository;
 import com.sinte.backend.repository.MatchPairRepository;
 import com.sinte.backend.repository.MatchTeamPlayerRepository;
 import com.sinte.backend.repository.MatchTeamRepository;
-import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.UserPositionRepository;
 import java.util.ArrayList;
 import java.util.Collections;
