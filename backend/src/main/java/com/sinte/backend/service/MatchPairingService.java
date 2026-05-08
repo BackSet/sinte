@@ -103,6 +103,9 @@ public class MatchPairingService {
 
     @Transactional
     public PairingResult executePairing(UUID matchId, UUID requesterUserId) {
+        matchPairRepository.deleteByMatchId(matchId);
+        matchPairRepository.flush();
+        
         MatchMatchups matchups = loadMatchups(matchId);
         List<PairingPlayer> allPlayers = new ArrayList<>(matchups.users);
         allPlayers.addAll(matchups.guests);
