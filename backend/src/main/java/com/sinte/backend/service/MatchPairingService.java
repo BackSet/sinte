@@ -324,7 +324,19 @@ public class MatchPairingService {
         MatchPair pair = new MatchPair(match, playerA, playerB, guestA, guestB, positionCode);
         matchPairRepository.save(pair);
 
-        return previewPairs(matchId);
+        List<MatchPair> savedPairs = matchPairRepository.findByMatchIdOrderByCreatedAtAsc(matchId);
+        List<PairView> pairViews = new ArrayList<>();
+        List<PairingPlayer> unpaired = new ArrayList<>();
+        int total = 0;
+
+        for (MatchPair p : savedPairs) {
+            PairingPlayer pa = toPairingPlayer(p.getPlayerA(), p.getGuestPlayerA());
+            PairingPlayer pb = toPairingPlayer(p.getPlayerB(), p.getGuestPlayerB());
+            pairViews.add(new PairView(p.getId(), p.getPositionCode(), pa, pb));
+            total += (pa.userId() != null || pa.guestPlayerId() != null ? 1 : 0) + (pb.userId() != null || pb.guestPlayerId() != null ? 1 : 0);
+        }
+
+        return new PairingResult(pairViews, unpaired, false, total);
     }
 
     @Transactional
@@ -420,6 +432,18 @@ public class MatchPairingService {
 
     private String getSecondaryPositionCode(PairingPlayer p) {
         return p.secondaryPositionCode();
+    }
+
+    private PairingPlayer toPairingPlayer(User user, GuestPlayer guest) {
+        if (user != null) {
+            return new PairingPlayer(user.getId(), null, user.getFullName(), user.getPlayerHandle(), "UNKNOWN", null, true);
+        }
+        if (guest != null) {
+            String handle = guest.getNickname();
+            if (guest.getShirtNumber() != null) handle += "#" + guest.getShirtNumber();
+            return new PairingPlayer(null, guest.getId(), guest.getFullName(), handle, "UNKNOWN", null, true);
+        }
+        return new PairingPlayer(null, null, null, null, "UNKNOWN", null, true);
     }
 
     private PairingPlayer toPairingPlayer(User user, GuestPlayer guest, String positionCode, Map<UUID, String> userPrimary, Map<UUID, String> guestPrimary) {
