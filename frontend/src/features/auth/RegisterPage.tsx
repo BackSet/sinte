@@ -18,6 +18,7 @@ export function RegisterPage() {
   const [phone, setPhone] = useState('')
   const [nickname, setNickname] = useState('')
   const [tag, setTag] = useState('')
+  const [shirtNumber, setShirtNumber] = useState(0)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [selectedPositions, setSelectedPositions] = useState<Array<{ positionCode: string; priority: number }>>([])
@@ -61,6 +62,7 @@ export function RegisterPage() {
       phone,
       nickname: nickname || undefined,
       tag,
+      shirtNumber,
       password,
       positions: selectedPositions.length > 0 ? selectedPositions : undefined,
     })
@@ -122,6 +124,19 @@ export function RegisterPage() {
             onChange={(e) => setTag(e.target.value.toUpperCase())}
             maxLength={10}
             placeholder="Ej: MITEAM123"
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium" htmlFor="register-shirt">Numero de camiseta</label>
+          <input
+            id="register-shirt"
+            className="ui-input"
+            type="number"
+            value={shirtNumber}
+            onChange={(e) => setShirtNumber(parseInt(e.target.value) || 0)}
+            min={0}
+            max={99}
             required
           />
         </div>

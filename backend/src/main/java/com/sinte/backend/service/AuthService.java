@@ -86,6 +86,7 @@ public class AuthService {
                 tag,
                 passwordEncoder.encode(request.password())
         );
+        user.setShirtNumber(request.shirtNumber());
         userHandleService.ensureHandle(user, null);
         User savedUser = userRepository.save(user);
 

@@ -18,7 +18,8 @@ export type RegisterPayload = {
   email: string
   phone: string
   nickname?: string
-  tag?: string
+  tag: string
+  shirtNumber: number
   password: string
   positions?: Array<{ positionCode: string; priority: number }>
 }
