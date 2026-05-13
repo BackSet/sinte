@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal'
 import { FormField } from '../../components/ui/FormField'
 import { DateTimeField } from '../../components/ui/DateTimeField'
 import { GroupSelector } from '../../components/ui/GroupSelector'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 
 type RecurrenceType = 'WEEKLY' | 'EVERY_N_DAYS' | 'MONTHLY_DAY_OF_MONTH'
@@ -316,8 +317,9 @@ export function SeriesPage() {
         title="Series recurrentes"
         description="Configura reglas semanales, cada N dias o mensual por dia del mes"
         action={
-          <button className="ui-button" onClick={openCreate}>
-            Nueva serie
+          <button className="ui-button" onClick={openCreate} title="Nueva serie">
+            <Icon name="user-plus" size="sm" />
+            <span>Nueva serie</span>
           </button>
         }
       >
@@ -348,15 +350,17 @@ export function SeriesPage() {
                 label: '',
                 className: 'text-right',
                 render: (series) => (
-                  <div className="flex justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => openEdit(series)}>Editar</button>
+                  <div className="flex justify-end gap-1">
+                    <button className="ui-icon-btn" onClick={() => openEdit(series)} title="Editar">
+                      <Icon name="eye" size="sm" />
+                    </button>
                     {series.active ? (
-                      <button className="ui-button-muted" onClick={() => deactivateMutation.mutate(series.id)} disabled={deactivateMutation.isPending}>
-                        {deactivateMutation.isPending ? 'Desactivando...' : 'Desactivar'}
+                      <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => deactivateMutation.mutate(series.id)} disabled={deactivateMutation.isPending} title="Desactivar">
+                        <Icon name="x" size="sm" />
                       </button>
                     ) : (
-                      <button className="ui-button-muted" onClick={() => reactivateSeries(series)} disabled={updateMutation.isPending}>
-                        {updateMutation.isPending ? 'Reactivando...' : 'Reactivar'}
+                      <button className="ui-icon-btn" onClick={() => reactivateSeries(series)} disabled={updateMutation.isPending} title="Reactivar">
+                        <Icon name="check" size="sm" />
                       </button>
                     )}
                   </div>
@@ -371,12 +375,18 @@ export function SeriesPage() {
                 <div className="ui-card p-2 text-sm">
                   {series.rules.map((rule, i) => <p key={`${series.id}-${i}`}>{describeRule(rule)}</p>)}
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button className="ui-button-muted" onClick={() => openEdit(series)}>Editar</button>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <button className="ui-icon-btn" onClick={() => openEdit(series)} title="Editar">
+                    <Icon name="eye" size="sm" />
+                  </button>
                   {series.active ? (
-                    <button className="ui-button-muted" onClick={() => deactivateMutation.mutate(series.id)}>Desactivar</button>
+                    <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => deactivateMutation.mutate(series.id)} title="Desactivar">
+                      <Icon name="x" size="sm" />
+                    </button>
                   ) : (
-                    <button className="ui-button-muted" onClick={() => reactivateSeries(series)}>Reactivar</button>
+                    <button className="ui-icon-btn" onClick={() => reactivateSeries(series)} title="Reactivar">
+                      <Icon name="check" size="sm" />
+                    </button>
                   )}
                 </div>
               </div>
@@ -486,15 +496,16 @@ export function SeriesPage() {
                   </div>
                 </div>
                 <div className="flex items-end justify-end md:col-span-1">
-                  <button className="ui-button-muted" type="button" disabled={form.rules.length === 1} onClick={() => removeRule(rule.id)}>
-                    Quitar
+                  <button className="ui-icon-btn ui-icon-btn-danger" type="button" disabled={form.rules.length === 1} onClick={() => removeRule(rule.id)} title="Quitar regla">
+                    <Icon name="trash" size="sm" />
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          <button className="ui-button-muted mt-3" type="button" onClick={addRule}>
-            + Agregar regla
+          <button className="ui-button-muted mt-3" type="button" onClick={addRule} title="Agregar regla">
+            <Icon name="user-plus" size="sm" />
+            <span>Agregar regla</span>
           </button>
         </div>
 
@@ -505,11 +516,13 @@ export function SeriesPage() {
         )}
 
         <Modal.Footer>
-          <button className="ui-button-muted" onClick={() => { setFormModalOpen(false); resetForm(); }}>
-            Cancelar
+          <button className="ui-button-muted" onClick={() => { setFormModalOpen(false); resetForm(); }} title="Cancelar">
+            <Icon name="x" size="sm" />
+            <span>Cancelar</span>
           </button>
-          <button className="ui-button" onClick={handleSubmit} disabled={isPending}>
-            {isPending ? 'Guardando...' : editingSeries ? 'Guardar cambios' : 'Crear serie'}
+          <button className="ui-button" onClick={handleSubmit} disabled={isPending} title={editingSeries ? 'Guardar cambios' : 'Crear serie'}>
+            <Icon name="check" size="sm" />
+            <span>{isPending ? 'Guardando...' : editingSeries ? 'Guardar cambios' : 'Crear serie'}</span>
           </button>
         </Modal.Footer>
       </Modal>

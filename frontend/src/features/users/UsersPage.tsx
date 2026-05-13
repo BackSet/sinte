@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal'
 import { DetailModal } from '../../components/ui/DetailModal'
 import { FormField } from '../../components/ui/FormField'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
 
@@ -160,8 +161,9 @@ export function UsersPage() {
         title="Usuarios"
         description="Gestiona jugadores y staff del sistema"
         action={
-          <button className="ui-button" onClick={() => setCreateModalOpen(true)}>
-            Nuevo usuario
+          <button className="ui-button" onClick={() => setCreateModalOpen(true)} title="Nuevo usuario">
+            <Icon name="user-plus" size="sm" />
+            <span>Nuevo usuario</span>
           </button>
         }
       >
@@ -194,11 +196,15 @@ export function UsersPage() {
                 label: '',
                 className: 'text-right',
                 render: (user) => (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => openDetail(user)}>Ver</button>
-                    <button className="ui-button-muted" onClick={() => openPositions(user)}>Posiciones</button>
-                    <button className="ui-button-muted" onClick={() => handleToggleActive(user)}>
-                      {user.active ? 'Desactivar' : 'Activar'}
+                  <div className="flex justify-end gap-1">
+                    <button className="ui-icon-btn" onClick={() => openDetail(user)} title="Ver">
+                      <Icon name="eye" size="sm" />
+                    </button>
+                    <button className="ui-icon-btn" onClick={() => openPositions(user)} title="Posiciones">
+                      <Icon name="users" size="sm" />
+                    </button>
+                    <button className={`ui-icon-btn ${user.active ? 'ui-icon-btn-danger' : ''}`} onClick={() => handleToggleActive(user)} title={user.active ? 'Desactivar' : 'Activar'}>
+                      <Icon name={user.active ? 'x' : 'check'} size="sm" />
                     </button>
                   </div>
                 ),
@@ -216,11 +222,15 @@ export function UsersPage() {
                 <p className="ui-text-muted">Telefono: {user.phone}</p>
                 <p className="ui-text-muted">Codigo: {user.playerHandle ?? '-'}</p>
                 <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
-                <div className="flex flex-wrap gap-2">
-                  <button className="ui-button-muted" onClick={() => openDetail(user)}>Ver</button>
-                  <button className="ui-button-muted" onClick={() => openPositions(user)}>Posiciones</button>
-                  <button className="ui-button-muted" onClick={() => handleToggleActive(user)}>
-                    {user.active ? 'Desactivar' : 'Activar'}
+                <div className="flex flex-wrap gap-1">
+                  <button className="ui-icon-btn" onClick={() => openDetail(user)} title="Ver">
+                    <Icon name="eye" size="sm" />
+                  </button>
+                  <button className="ui-icon-btn" onClick={() => openPositions(user)} title="Posiciones">
+                    <Icon name="users" size="sm" />
+                  </button>
+                  <button className={`ui-icon-btn ${user.active ? 'ui-icon-btn-danger' : ''}`} onClick={() => handleToggleActive(user)} title={user.active ? 'Desactivar' : 'Activar'}>
+                    <Icon name={user.active ? 'x' : 'check'} size="sm" />
                   </button>
                 </div>
               </div>
@@ -308,11 +318,13 @@ export function UsersPage() {
         )}
 
         <Modal.Footer>
-          <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setUserForm(emptyUserForm()); }}>
-            Cancelar
+          <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setUserForm(emptyUserForm()); }} title="Cancelar">
+            <Icon name="x" size="sm" />
+            <span>Cancelar</span>
           </button>
-          <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !userForm.fullName || !userForm.email || !userForm.phone || !userForm.password}>
-            {createMutation.isPending ? 'Guardando...' : 'Guardar usuario'}
+          <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !userForm.fullName || !userForm.email || !userForm.phone || !userForm.password} title="Guardar usuario">
+            <Icon name="check" size="sm" />
+            <span>{createMutation.isPending ? 'Guardando...' : 'Guardar usuario'}</span>
           </button>
         </Modal.Footer>
       </Modal>
@@ -350,11 +362,13 @@ export function UsersPage() {
           </DetailModal.Section>
 
           <Modal.Footer>
-            <button className="ui-button-muted" onClick={() => { setDetailModalOpen(false); setViewingUser(null); }}>
-              Cerrar
+            <button className="ui-button-muted" onClick={() => { setDetailModalOpen(false); setViewingUser(null); }} title="Cerrar">
+              <Icon name="x" size="sm" />
+              <span>Cerrar</span>
             </button>
-            <button className="ui-button" onClick={() => { setDetailModalOpen(false); openPositions(viewingUser); }}>
-              Gestionar posiciones
+            <button className="ui-button" onClick={() => { setDetailModalOpen(false); openPositions(viewingUser); }} title="Gestionar posiciones">
+              <Icon name="users" size="sm" />
+              <span>Gestionar posiciones</span>
             </button>
           </Modal.Footer>
         </DetailModal>
@@ -428,11 +442,13 @@ export function UsersPage() {
           )}
 
           <Modal.Footer>
-            <button className="ui-button-muted" onClick={() => { setPositionsModalOpen(false); setEditingPositionsUser(null); setSelectedPositions([]); }}>
-              Cancelar
+            <button className="ui-button-muted" onClick={() => { setPositionsModalOpen(false); setEditingPositionsUser(null); setSelectedPositions([]); }} title="Cancelar">
+              <Icon name="x" size="sm" />
+              <span>Cancelar</span>
             </button>
-            <button className="ui-button" onClick={() => savePositionsMutation.mutate()} disabled={savePositionsMutation.isPending || selectedPositions.length === 0}>
-              {savePositionsMutation.isPending ? 'Guardando...' : 'Guardar posiciones'}
+            <button className="ui-button" onClick={() => savePositionsMutation.mutate()} disabled={savePositionsMutation.isPending || selectedPositions.length === 0} title="Guardar posiciones">
+              <Icon name="check" size="sm" />
+              <span>{savePositionsMutation.isPending ? 'Guardando...' : 'Guardar posiciones'}</span>
             </button>
           </Modal.Footer>
         </Modal>

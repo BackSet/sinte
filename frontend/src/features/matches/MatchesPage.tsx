@@ -10,6 +10,7 @@ import { GroupSelector } from '../../components/ui/GroupSelector'
 import { PairBadge } from '../../components/ui/PairBadge'
 import { PairingStatusBar } from '../../components/ui/PairingStatusBar'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 import { useAuthStore } from '../../store/auth-store'
 import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
@@ -194,6 +195,7 @@ export function MatchesPage() {
   const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
   const user = useAuthStore((state) => state.user)
   const canManageTeams = user?.roles.some((role) => role === 'DT' || role === 'ADMIN')
+  const canManageGuests = user?.roles.some((role) => role === 'DT' || role === 'ADMIN' || role === 'PLAYER')
   const isManager = Boolean(canManageTeams)
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -221,7 +223,7 @@ export function MatchesPage() {
   const guestsQuery = useQuery({
     queryKey: ['match-guests', selectedMatch?.id],
     queryFn: async () => (await apiClient.get<GuestPlayerItem[]>(`/api/v1/matches/${selectedMatch!.id}/guest-players`)).data,
-    enabled: Boolean(selectedMatch) && isManager,
+    enabled: Boolean(selectedMatch) && Boolean(canManageGuests),
   })
 
   const confirmedQuery = useQuery({
@@ -352,6 +354,8 @@ export function MatchesPage() {
     mutationFn: async () => (await apiClient.post<PairingPreviewResponse>(`/api/v1/matches/${selectedMatch!.id}/pairs`)).data,
     onSuccess: (data) => {
       addToast('success', `${data.pairs.length} parejas generadas`)
+      // Actualizamos el estado inmediatamente para que el usuario vea las parejas sin esperar al refetch.
+      queryClient.setQueryData(['match-pairing', selectedMatch?.id], data)
       queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
       queryClient.invalidateQueries({ queryKey: ['match-teams', selectedMatch?.id] })
     },
@@ -394,12 +398,13 @@ export function MatchesPage() {
         positionCode: manualPairPosition,
       })
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       addToast('success', 'Pareja creada')
       setManualPairMode(false)
       setManualPairA(null)
       setManualPairB(null)
       setManualPairPosition('')
+      queryClient.setQueryData(['match-pairing', selectedMatch?.id], data)
       queryClient.invalidateQueries({ queryKey: ['match-pairing', selectedMatch?.id] })
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo crear la pareja')),
@@ -457,7 +462,7 @@ export function MatchesPage() {
     { label: 'Roster', active: detailTab === 'roster', onClick: () => setDetailTab('roster') },
     ...(canManageTeams ? [{ label: 'Parejas', active: detailTab === 'pairs', onClick: () => setDetailTab('pairs') }] : []),
     ...(canManageTeams ? [{ label: 'Equipos', active: detailTab === 'teams', onClick: () => setDetailTab('teams') }] : []),
-    ...(isManager ? [{ label: 'Invitados', active: detailTab === 'guests', onClick: () => setDetailTab('guests') }] : []),
+    ...(canManageGuests ? [{ label: 'Invitados', active: detailTab === 'guests', onClick: () => setDetailTab('guests') }] : []),
   ]
 
   return (
@@ -468,9 +473,10 @@ export function MatchesPage() {
         <ResponsiveSection
           title="Partidos"
           description="Gestiona convocatorias y partidos manuales"
-          action={
-            <button className="ui-button" onClick={() => setCreateModalOpen(true)}>
-              Nuevo partido
+            action={
+            <button className="ui-button" onClick={() => setCreateModalOpen(true)} title="Nuevo partido">
+              <Icon name="user-plus" size="sm" />
+              <span>Nuevo partido</span>
             </button>
           }
         />
@@ -505,7 +511,15 @@ export function MatchesPage() {
               { key: 'title', label: 'Titulo', render: (match) => match.title },
               { key: 'location', label: 'Ubicacion', render: (match) => match.location ?? '-' },
               { key: 'start', label: 'Inicio', render: (match) => toDateTimeLocalValue(match.startsAt).replace('T', ' ') },
-              { key: 'status', label: 'Estado', render: (match) => statusLabel(match) },
+              { key: 'status', label: 'Estado', render: (match) => {
+                const isCancelled = match.status === 'CANCELLED'
+                const isClosed = isMatchClosed(match) && match.status === 'SCHEDULED'
+                return (
+                  <span className={`ui-badge ${isCancelled ? 'ui-badge-danger' : isClosed ? 'ui-badge-muted' : 'ui-badge-success'}`}>
+                    {statusLabel(match)}
+                  </span>
+                )
+              }},
               ...(isManager ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }] : []),
               { key: 'roster', label: 'Plantilla', render: (match) => `${match.confirmedCount} / ${match.targetPlayers ?? '-'}` },
               { key: 'source', label: 'Origen', render: (match) => sourceTypeLabel(match.sourceType) },
@@ -519,16 +533,18 @@ export function MatchesPage() {
                 label: '',
                 className: 'text-right',
                 render: (match) => (
-                  <div className="flex justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => openDetail(match)}>Ver detalle</button>
+                  <div className="flex justify-end gap-1">
+                    <button className="ui-icon-btn" onClick={() => openDetail(match)} title="Ver detalle">
+                      <Icon name="eye" size="sm" />
+                    </button>
                     {isManager && (
-                      <button className="ui-button-muted" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending}>
-                        {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
+                      <button className="ui-icon-btn" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending} title="Cancelar partido">
+                        <Icon name="x" size="sm" />
                       </button>
                     )}
                     {canManageTeams && (
-                      <button className="ui-button-muted" onClick={() => exportConfirmedMutation.mutate(match.id)} disabled={exportConfirmedMutation.isPending}>
-                        {exportConfirmedMutation.isPending ? 'Exportando...' : 'Exportar'}
+                      <button className="ui-icon-btn" onClick={() => exportConfirmedMutation.mutate(match.id)} disabled={exportConfirmedMutation.isPending} title="Exportar confirmados">
+                        <Icon name="configs" size="sm" />
                       </button>
                     )}
                   </div>
@@ -549,16 +565,18 @@ export function MatchesPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="ui-text-muted text-xs font-medium uppercase">{statusLabel(match)} | {sourceTypeLabel(match.sourceType)}</span>
                   {isManager && (
-                    <button className="ui-button-muted" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending}>
-                      {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar'}
+                    <button className="ui-icon-btn" onClick={() => handleCancelMatch(match)} disabled={match.status === 'CANCELLED' || cancelMutation.isPending} title="Cancelar partido">
+                      <Icon name="x" size="sm" />
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="ui-button-muted" onClick={() => openDetail(match)}>Ver detalle</button>
+                <div className="flex flex-wrap gap-1">
+                  <button className="ui-icon-btn" onClick={() => openDetail(match)} title="Ver detalle">
+                    <Icon name="eye" size="sm" />
+                  </button>
                   {canManageTeams && (
-                    <button className="ui-button-muted" onClick={() => exportConfirmedMutation.mutate(match.id)}>
-                      {exportConfirmedMutation.isPending ? 'Exportando...' : 'Exportar'}
+                    <button className="ui-icon-btn" onClick={() => exportConfirmedMutation.mutate(match.id)} title="Exportar confirmados">
+                      <Icon name="configs" size="sm" />
                     </button>
                   )}
                 </div>
@@ -633,11 +651,13 @@ export function MatchesPage() {
           )}
 
           <Modal.Footer>
-            <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setMatchForm(emptyMatchForm()); }}>
-              Cancelar
+            <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setMatchForm(emptyMatchForm()); }} title="Cancelar">
+              <Icon name="x" size="sm" />
+              <span>Cancelar</span>
             </button>
-            <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !matchForm.title.trim() || !matchForm.startsAt || !matchForm.configLocation}>
-              {createMutation.isPending ? 'Creando...' : 'Crear partido'}
+            <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !matchForm.title.trim() || !matchForm.startsAt || !matchForm.configLocation} title="Crear partido">
+              <Icon name="check" size="sm" />
+              <span>{createMutation.isPending ? 'Creando...' : 'Crear partido'}</span>
             </button>
           </Modal.Footer>
         </Modal>
@@ -661,11 +681,11 @@ export function MatchesPage() {
                   <div className="ui-detail-section">
                     <p className="ui-detail-section-title">Titulares ({rosterQuery.data.roster.length} / {selectedMatch.targetPlayers ?? '-'})</p>
                     {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted text-sm">Aun no hay titulares.</p>}
-                    <div className="space-y-1">
+                      <div className="space-y-1">
                       {rosterQuery.data.roster.map((p, index) => {
                         const key = p.userId ?? p.guestPlayerId ?? `roster-${index}`
                         return (
-                          <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                          <div key={key} className="flex items-center justify-between rounded-md border bg-[var(--bg-panel)] px-3 py-2">
                             <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
                             <span className="ui-text-muted text-xs">
                               {positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}
@@ -683,7 +703,7 @@ export function MatchesPage() {
                         {rosterQuery.data.waitlist.map((p, index) => {
                           const key = p.userId ?? p.guestPlayerId ?? `waitlist-${index}`
                           return (
-                            <div key={key} className="flex items-center justify-between rounded-md border px-3 py-2">
+                            <div key={key} className="flex items-center justify-between rounded-md border bg-[var(--bg-panel)] px-3 py-2">
                               <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
                               <span className="ui-text-muted text-xs">{positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}</span>
                             </div>
@@ -699,7 +719,7 @@ export function MatchesPage() {
                       <div className="space-y-1">
                         {rosterQuery.data.cancelled.map((p, index) => {
                           const key = p.userId ?? p.guestPlayerId ?? `cancelled-${index}`
-                          return <div key={key} className="rounded-md border px-3 py-2 ui-text-muted">{p.fullName}{p.guestPlayerId ? ' — Invitado' : ''}</div>
+                          return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2 ui-text-muted">{p.fullName}{p.guestPlayerId ? ' — Invitado' : ''}</div>
                         })}
                       </div>
                     </div>
@@ -711,7 +731,7 @@ export function MatchesPage() {
                   <div className="space-y-1">
                     {confirmedQuery.data.map((player, index) => {
                       const key = player.userId ?? player.guestPlayerId ?? `confirmed-${index}`
-                      return <div key={key} className="rounded-md border px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' — Invitado' : ''}</div>
+                      return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' — Invitado' : ''}</div>
                     })}
                   </div>
                 </div>
@@ -737,17 +757,17 @@ export function MatchesPage() {
                 <h4 className="mb-3 text-sm font-semibold">Flujo de emparejamiento</h4>
                 <div className="mb-4 flex items-center gap-3">
                   <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${pairingQuery.data?.pairs.length ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">1</span>
+                    <Icon name="users" size="sm" />
                     Generar parejas
                   </div>
                   <span className="text-[var(--text-secondary)]">→</span>
-                  <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${pairingQuery.data?.pairs.length ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">2</span>
+                  <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${teamsQuery.data && teamsQuery.data.length > 0 ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
+                    <Icon name="dashboard" size="sm" />
                     Sortear equipos
                   </div>
                   <span className="text-[var(--text-secondary)]">→</span>
                   <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ${teamsQuery.data && teamsQuery.data.length > 0 ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--bg-panel)] text-[var(--text-secondary)]'}`}>
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--success)] text-[10px] text-white">3</span>
+                    <Icon name="configs" size="sm" />
                     Ajustar si es necesario
                   </div>
                 </div>
@@ -756,8 +776,10 @@ export function MatchesPage() {
                     className="ui-button"
                     onClick={() => generatePairsMutation.mutate()}
                     disabled={generatePairsMutation.isPending}
+                    title="Generar parejas"
                   >
-                    {generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}
+                    <Icon name="users" size="sm" />
+                    <span>{generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}</span>
                   </button>
                   <button
                     className={`ui-button ${manualPairMode ? 'ui-button-primary' : 'ui-button-muted'}`}
@@ -769,23 +791,29 @@ export function MatchesPage() {
                         setManualPairPosition('')
                       }
                     }}
+                    title={manualPairMode ? 'Cancelar' : 'Emparejamiento manual'}
                   >
-                    {manualPairMode ? 'Cancelar' : 'Emparejamiento manual'}
+                    <Icon name="user-plus" size="sm" />
+                    <span>{manualPairMode ? 'Cancelar' : 'Emparejamiento manual'}</span>
                   </button>
                   <button
                     className="ui-button-primary"
                     onClick={() => drawTeamsMutation.mutate()}
                     disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
+                    title="Sortear equipos"
                   >
-                    {drawTeamsMutation.isPending ? 'Sorteando...' : 'Sortear equipos'}
+                    <Icon name="dashboard" size="sm" />
+                    <span>{drawTeamsMutation.isPending ? 'Sorteando...' : 'Sortear equipos'}</span>
                   </button>
                   {(pairingQuery.data?.pairs.length ?? 0) > 0 && (
                     <button
                       className="ui-button-muted"
                       onClick={() => resetPairsMutation.mutate()}
                       disabled={resetPairsMutation.isPending}
+                      title="Reiniciar parejas y equipos"
                     >
-                      {resetPairsMutation.isPending ? 'Reiniciando...' : 'Reiniciar todo'}
+                      <Icon name="trash" size="sm" />
+                      <span>{resetPairsMutation.isPending ? 'Reiniciando...' : 'Reiniciar todo'}</span>
                     </button>
                   )}
                 </div>
@@ -805,12 +833,21 @@ export function MatchesPage() {
                         <label className="ui-form-label">Jugador A</label>
                         <select className="ui-input" value={manualPairA ?? ''} onChange={(e) => setManualPairA(e.target.value || null)}>
                           <option value="">Seleccionar...</option>
-                          {(manualPairPlayerTypeA === 'user' ? (confirmedQuery.data ?? []) : (guestsQuery.data?.filter(g => g.status === 'YES') ?? []))
-                            .map((p: any) => (
-                              <option key={p.userId ?? p.id} value={p.userId ?? p.id}>
-                                {p.fullName}
-                              </option>
-                            ))}
+                          {manualPairPlayerTypeA === 'user'
+                            ? (confirmedQuery.data ?? [])
+                                .filter((p) => Boolean(p.userId))
+                                .map((p) => (
+                                  <option key={p.userId!} value={p.userId!}>
+                                    {p.fullName}
+                                  </option>
+                                ))
+                            : (guestsQuery.data ?? [])
+                                .filter((g) => g.status === 'YES')
+                                .map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.fullName}
+                                  </option>
+                                ))}
                         </select>
                       </div>
                       <div>
@@ -824,12 +861,21 @@ export function MatchesPage() {
                         <label className="ui-form-label">Jugador B</label>
                         <select className="ui-input" value={manualPairB ?? ''} onChange={(e) => setManualPairB(e.target.value || null)}>
                           <option value="">Seleccionar...</option>
-                          {(manualPairPlayerTypeB === 'user' ? (confirmedQuery.data ?? []) : (guestsQuery.data?.filter(g => g.status === 'YES') ?? []))
-                            .map((p: any) => (
-                              <option key={p.userId ?? p.id} value={p.userId ?? p.id}>
-                                {p.fullName}
-                              </option>
-                            ))}
+                          {manualPairPlayerTypeB === 'user'
+                            ? (confirmedQuery.data ?? [])
+                                .filter((p) => Boolean(p.userId))
+                                .map((p) => (
+                                  <option key={p.userId!} value={p.userId!}>
+                                    {p.fullName}
+                                  </option>
+                                ))
+                            : (guestsQuery.data ?? [])
+                                .filter((g) => g.status === 'YES')
+                                .map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.fullName}
+                                  </option>
+                                ))}
                         </select>
                       </div>
                       <div className="sm:col-span-2">
@@ -847,8 +893,10 @@ export function MatchesPage() {
                           className="ui-button-primary w-full"
                           onClick={() => createManualPairMutation.mutate()}
                           disabled={createManualPairMutation.isPending || !manualPairA || !manualPairB || !manualPairPosition}
+                          title="Crear pareja"
                         >
-                          {createManualPairMutation.isPending ? 'Creando...' : 'Crear pareja'}
+                          <Icon name="check" size="sm" />
+                          <span>{createManualPairMutation.isPending ? 'Creando...' : 'Crear pareja'}</span>
                         </button>
                       </div>
                     </div>
@@ -884,6 +932,7 @@ export function MatchesPage() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-[var(--border-soft)] p-8 text-center">
+                      <Icon name="users" size="lg" className="ui-text-muted mb-3 mx-auto" />
                       <p className="ui-text-muted text-sm">Presiona "Generar parejas" para crear los emparejamientos automaticamente.</p>
                     </div>
                   )}
@@ -920,22 +969,28 @@ export function MatchesPage() {
                       className="ui-button-muted text-xs"
                       onClick={() => drawTeamsMutation.mutate()}
                       disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
+                      title="Volver a sortear"
                     >
-                      {drawTeamsMutation.isPending ? 'Sorteando...' : 'Volver a sortear'}
+                      <Icon name="configs" size="sm" />
+                      <span>{drawTeamsMutation.isPending ? 'Sorteando...' : 'Volver a sortear'}</span>
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     {teamsQuery.data.map((team) => (
                       <div
                         key={team.teamNumber}
                         className={`rounded-lg border p-4 ${
                           team.teamNumber === 1
-                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/20'
-                            : 'border-orange-700 bg-orange-50 dark:bg-orange-950/20'
+                            ? 'border-blue-500/30 bg-blue-50 dark:border-blue-400/25 dark:bg-blue-950/20'
+                            : 'border-orange-600/30 bg-orange-50 dark:border-orange-400/25 dark:bg-orange-950/20'
                         }`}
                       >
                         <div className="mb-3 flex items-center justify-between">
-                          <h4 className="font-semibold">{team.name}</h4>
+                          <h4 className={`font-semibold ${
+                            team.teamNumber === 1
+                              ? 'text-blue-700 dark:text-blue-300'
+                              : 'text-orange-700 dark:text-orange-300'
+                          }`}>{team.name}</h4>
                           <span className="ui-text-muted text-xs">{team.players.length} jugadores</span>
                         </div>
                         <div className="space-y-2">
@@ -945,20 +1000,20 @@ export function MatchesPage() {
                               ? player.playerHandle
                               : player.guestPlayerId ? `[Inv.]` : ''
                             return (
-                              <div key={key} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
+                              <div key={key} className="flex items-center justify-between rounded-md bg-[var(--bg-panel)] px-3 py-2 shadow-sm">
                                 <div className="flex items-center gap-2">
                                   <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                                     team.teamNumber === 1
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-orange-700 text-white'
+                                      ? 'bg-blue-600 text-white dark:bg-blue-500'
+                                      : 'bg-orange-700 text-white dark:bg-orange-600'
                                   }`}>
                                     {i + 1}
                                   </span>
-                                  <span className="text-sm font-medium">{player.fullName}</span>
+                                  <span className="text-sm font-medium text-[var(--text-primary)]">{player.fullName}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {handle && <span className="ui-text-muted text-xs">{handle}</span>}
-                                  <span className="rounded border px-1.5 py-0.5 text-xs">{positionLabel(player.primaryPositionCode)}</span>
+                                  <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-hover)] px-1.5 py-0.5 text-xs text-[var(--text-secondary)]">{positionLabel(player.primaryPositionCode)}</span>
                                 </div>
                               </div>
                             )
@@ -973,6 +1028,7 @@ export function MatchesPage() {
                 </>
               ) : (
                 <div className="rounded-lg border border-dashed border-[var(--border-soft)] p-8 text-center">
+                  <Icon name="dashboard" size="lg" className="ui-text-muted mb-3 mx-auto" />
                   <p className="text-sm font-medium">Aun no hay equipos sorteados</p>
                   <p className="ui-text-muted mt-1 text-xs">Ve a la pestaña "Parejas" y presiona "Sortear equipos" para generar los equipos automaticamente.</p>
                 </div>
@@ -981,7 +1037,7 @@ export function MatchesPage() {
           )}
 
           {/* Guests Tab */}
-          {detailTab === 'guests' && isManager && (
+          {detailTab === 'guests' && canManageGuests && (
             <div className="space-y-4">
               <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" onSubmit={(e) => {
                 e.preventDefault()
@@ -1009,8 +1065,9 @@ export function MatchesPage() {
                     ))}
                   </div>
                 </div>
-                <button className="ui-button sm:col-span-2 xl:col-span-4" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()}>
-                  {createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}
+                <button className="ui-button sm:col-span-2 xl:col-span-4" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()} title="Agregar invitado">
+                  <Icon name="user-plus" size="sm" />
+                  <span>{createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}</span>
                 </button>
               </form>
 
@@ -1031,26 +1088,38 @@ export function MatchesPage() {
                           {guest.positions.length > 0 ? guest.positions.filter(p => p.isPrimary).map(p => positionLabel(p.positionCode)).join(', ') || guest.positions[0] ? positionLabel(guest.positions[0].positionCode) : 'Sin posicion' : 'Sin posicion'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         {guest.status === 'PENDING' && (
                           <>
-                            <button className="ui-button text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending}>Confirmar</button>
-                            <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'NO' })} disabled={updateGuestStatusMutation.isPending}>Declinar</button>
+                            <button className="ui-icon-btn" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending} title="Confirmar">
+                              <Icon name="check" size="sm" />
+                            </button>
+                            <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'NO' })} disabled={updateGuestStatusMutation.isPending} title="Declinar">
+                              <Icon name="x" size="sm" />
+                            </button>
                           </>
                         )}
                         {guest.status === 'YES' && (
-                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'CANCELLED' })} disabled={updateGuestStatusMutation.isPending}>Cancelar</button>
+                          <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'CANCELLED' })} disabled={updateGuestStatusMutation.isPending} title="Cancelar">
+                            <Icon name="x" size="sm" />
+                          </button>
                         )}
                         {guest.status === 'CANCELLED' && (
-                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending}>Reactivar</button>
+                          <button className="ui-icon-btn" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending} title="Reactivar">
+                            <Icon name="eye" size="sm" />
+                          </button>
                         )}
                         {guest.status === 'NO' && (
-                          <button className="ui-button-muted text-xs" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'PENDING' })} disabled={updateGuestStatusMutation.isPending}>Pendiente</button>
+                          <button className="ui-icon-btn" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'PENDING' })} disabled={updateGuestStatusMutation.isPending} title="Pendiente">
+                            <Icon name="clock" size="sm" />
+                          </button>
                         )}
                         <span className={`ui-badge ${guest.status === 'YES' ? 'ui-badge-success' : guest.status === 'NO' ? 'ui-badge-danger' : 'ui-badge-muted'}`}>
                           {guest.status === 'YES' ? 'Confirmado' : guest.status === 'NO' ? 'No asistira' : guest.status === 'CANCELLED' ? 'Cancelado' : 'Pendiente'}
                         </span>
-                        <button className="text-xs text-[var(--danger)] hover:underline" onClick={() => deleteGuestMutation.mutate(guest.id)} disabled={deleteGuestMutation.isPending}>Eliminar</button>
+                        <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => deleteGuestMutation.mutate(guest.id)} disabled={deleteGuestMutation.isPending} title="Eliminar invitado">
+                          <Icon name="trash" size="sm" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1058,7 +1127,10 @@ export function MatchesPage() {
               )}
 
               {guestsQuery.data && guestsQuery.data.length === 0 && (
-                <p className="ui-text-muted text-sm">No hay invitados agregados a este partido.</p>
+                <div className="rounded-lg border border-dashed border-[var(--border-soft)] p-6 text-center">
+                  <Icon name="user-plus" size="lg" className="ui-text-muted mb-2 mx-auto" />
+                  <p className="ui-text-muted text-sm">No hay invitados agregados a este partido.</p>
+                </div>
               )}
             </div>
           )}

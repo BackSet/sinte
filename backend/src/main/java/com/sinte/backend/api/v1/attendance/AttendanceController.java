@@ -35,7 +35,8 @@ public class AttendanceController {
     @GetMapping("/match/{matchId}")
     @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<List<AttendanceResponse>> byMatch(@PathVariable UUID matchId) {
-        List<AttendanceResponse> attendance = attendanceService.getAttendanceByMatch(matchId).stream()
+        UUID userId = SecurityUtils.currentUserId();
+        List<AttendanceResponse> attendance = attendanceService.getAttendanceByMatch(matchId, userId).stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(attendance);

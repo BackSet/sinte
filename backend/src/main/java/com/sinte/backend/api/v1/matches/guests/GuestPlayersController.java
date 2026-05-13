@@ -32,7 +32,7 @@ public class GuestPlayersController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<GuestPlayerResponse> create(
             @PathVariable UUID matchId,
             @Valid @RequestBody CreateGuestPlayerRequest request
@@ -47,12 +47,13 @@ public class GuestPlayersController {
     @GetMapping
     @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<List<GuestPlayerResponse>> list(@PathVariable UUID matchId) {
-        List<GuestPlayer> guests = guestPlayerService.listGuestPlayers(matchId);
+        UUID userId = SecurityUtils.currentUserId();
+        List<GuestPlayer> guests = guestPlayerService.listGuestPlayers(matchId, userId);
         return ResponseEntity.ok(guests.stream().map(this::toResponse).toList());
     }
 
     @PutMapping("/{guestPlayerId}/attendance")
-    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<GuestPlayerResponse> updateAttendance(
             @PathVariable UUID matchId,
             @PathVariable UUID guestPlayerId,
@@ -61,20 +62,20 @@ public class GuestPlayersController {
         UUID userId = SecurityUtils.currentUserId();
         GuestPlayer guest;
         switch (request.status()) {
-            case "YES" -> guest = guestPlayerService.confirmGuest(guestPlayerId, userId);
-            case "NO" -> guest = guestPlayerService.declineGuest(guestPlayerId, userId);
-            case "CANCELLED" -> guest = guestPlayerService.cancelGuest(guestPlayerId, userId);
-            case "PENDING" -> guest = guestPlayerService.resetGuestToPending(guestPlayerId, userId);
+            case "YES" -> guest = guestPlayerService.confirmGuest(matchId, guestPlayerId, userId);
+            case "NO" -> guest = guestPlayerService.declineGuest(matchId, guestPlayerId, userId);
+            case "CANCELLED" -> guest = guestPlayerService.cancelGuest(matchId, guestPlayerId, userId);
+            case "PENDING" -> guest = guestPlayerService.resetGuestToPending(matchId, guestPlayerId, userId);
             default -> throw new IllegalArgumentException("Estado no valido: " + request.status());
         }
         return ResponseEntity.ok(toResponse(guest));
     }
 
     @DeleteMapping("/{guestPlayerId}")
-    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<Void> delete(@PathVariable UUID matchId, @PathVariable UUID guestPlayerId) {
         UUID userId = SecurityUtils.currentUserId();
-        guestPlayerService.deleteGuest(guestPlayerId, userId);
+        guestPlayerService.deleteGuest(matchId, guestPlayerId, userId);
         return ResponseEntity.noContent().build();
     }
 

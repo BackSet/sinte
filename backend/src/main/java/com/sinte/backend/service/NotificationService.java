@@ -15,16 +15,13 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
-    private final EmailQueueService emailQueueService;
 
     public NotificationService(
             NotificationRepository notificationRepository,
-            UserRepository userRepository,
-            EmailQueueService emailQueueService
+            UserRepository userRepository
     ) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
-        this.emailQueueService = emailQueueService;
     }
 
     @Transactional
@@ -33,7 +30,6 @@ public class NotificationService {
                 .orElseThrow(() -> new DomainException("Usuario no encontrado"));
 
         Notification notification = notificationRepository.save(new Notification(user, type, title, body));
-        emailQueueService.enqueue(user.getEmail(), title, body);
         return notification;
     }
 

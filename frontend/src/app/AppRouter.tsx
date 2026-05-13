@@ -12,7 +12,6 @@ import { MatchesPage } from '../features/matches/MatchesPage'
 import { SeriesPage } from '../features/series/SeriesPage'
 import { AttendancePage } from '../features/attendance/AttendancePage'
 import { NotificationsPage } from '../features/notifications/NotificationsPage'
-import { AdminEmailQueuePage } from '../features/admin/AdminEmailQueuePage'
 import { GroupsPage } from '../features/groups/GroupsPage'
 import { MyGroupsPage } from '../features/groups/MyGroupsPage'
 import { ConfigsPage } from '../features/configs/ConfigsPage'
@@ -54,10 +53,6 @@ const router = createBrowserRouter([
           { path: '/attendance', element: <AttendancePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
           { path: '/profile', element: <ProfilePage /> },
-          {
-            element: <RequireRole allowed={['ADMIN']} />,
-            children: [{ path: '/admin/email-queue', element: <AdminEmailQueuePage /> }],
-          },
           { path: '*', element: <Navigate to="/dashboard" replace /> },
         ],
       },

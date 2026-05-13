@@ -52,21 +52,30 @@ class GroupMatchTargetingIntegrationTest {
                 "dt@test.com",
                 "0992222222",
                 "dtmaster",
-                "Secret123!"
+                "DT001",
+                1,
+                "Secret123!",
+                List.of(new RegisterRequest.PositionRequest("CENTER_BACK", 1))
         ));
         AuthResponse playerInGroup = authService.register(new RegisterRequest(
                 "Jugador Grupo",
                 "player.group@test.com",
                 "0993333333",
                 "grupo",
-                "Secret123!"
+                "GR001",
+                2,
+                "Secret123!",
+                List.of(new RegisterRequest.PositionRequest("LEFT_BACK", 1))
         ));
         AuthResponse playerOutGroup = authService.register(new RegisterRequest(
                 "Jugador Fuera",
                 "player.out@test.com",
                 "0994444444",
                 "fuera",
-                "Secret123!"
+                "FU001",
+                3,
+                "Secret123!",
+                List.of(new RegisterRequest.PositionRequest("RIGHT_BACK", 1))
         ));
 
         SinteGroup group = groupService.createGroup(dt.userId(), "Titulares");

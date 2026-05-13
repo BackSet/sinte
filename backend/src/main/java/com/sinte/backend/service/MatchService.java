@@ -179,7 +179,6 @@ public class MatchService {
                 request.defaultTitle(),
                 today,
                 null,
-                request.timezone(),
                 config
         );
         MatchSeries savedSeries = matchSeriesRepository.save(series);
@@ -214,8 +213,7 @@ public class MatchService {
         );
 
         series.updateMetadata(
-                request.defaultTitle(),
-                request.timezone()
+                request.defaultTitle()
         );
 
         if (request.configId() != null) {

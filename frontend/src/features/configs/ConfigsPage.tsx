@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal'
 import { DetailModal } from '../../components/ui/DetailModal'
 import { FormField } from '../../components/ui/FormField'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 
 type MatchConfigItem = {
@@ -184,11 +185,15 @@ export function ConfigsPage() {
                 label: '',
                 className: 'text-right',
                 render: (c) => (
-                  <div className="flex justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => openDetail(c)}>Ver</button>
-                    <button className="ui-button-muted" onClick={() => openEdit(c)}>Editar</button>
-                    <button className="ui-button-muted" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending}>
-                      Eliminar
+                  <div className="flex justify-end gap-1">
+                    <button className="ui-icon-btn" onClick={() => openDetail(c)} title="Ver">
+                      <Icon name="eye" size="sm" />
+                    </button>
+                    <button className="ui-icon-btn" onClick={() => openEdit(c)} title="Editar">
+                      <Icon name="configs" size="sm" />
+                    </button>
+                    <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending} title="Eliminar">
+                      <Icon name="trash" size="sm" />
                     </button>
                   </div>
                 ),
@@ -200,11 +205,15 @@ export function ConfigsPage() {
                 <p className="ui-text-muted">Plantilla: {c.targetPlayers} jugadores</p>
                 <p className="ui-text-muted">Duracion: {c.durationMinutes} min | {c.timezone}</p>
                 {c.description && <p className="ui-text-muted">{c.description}</p>}
-                <div className="flex gap-2">
-                  <button className="ui-button-muted" onClick={() => openDetail(c)}>Ver</button>
-                  <button className="ui-button-muted" onClick={() => openEdit(c)}>Editar</button>
-                  <button className="ui-button-muted" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending}>
-                    Eliminar
+                <div className="flex gap-1">
+                  <button className="ui-icon-btn" onClick={() => openDetail(c)} title="Ver">
+                    <Icon name="eye" size="sm" />
+                  </button>
+                  <button className="ui-icon-btn" onClick={() => openEdit(c)} title="Editar">
+                    <Icon name="configs" size="sm" />
+                  </button>
+                  <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDelete(c)} disabled={deleteMutation.isPending} title="Eliminar">
+                    <Icon name="trash" size="sm" />
                   </button>
                 </div>
               </div>
@@ -279,11 +288,13 @@ export function ConfigsPage() {
         )}
 
         <Modal.Footer>
-          <button className="ui-button-muted" onClick={() => { setFormModalOpen(false); setEditingConfig(null); setForm(emptyForm()); }}>
-            Cancelar
+          <button className="ui-button-muted" onClick={() => { setFormModalOpen(false); setEditingConfig(null); setForm(emptyForm()); }} title="Cancelar">
+            <Icon name="x" size="sm" />
+            <span>Cancelar</span>
           </button>
-          <button className="ui-button" onClick={handleSubmit} disabled={isPending || !form.location.trim()}>
-            {isPending ? 'Guardando...' : editingConfig ? 'Guardar cambios' : 'Crear configuracion'}
+          <button className="ui-button" onClick={handleSubmit} disabled={isPending || !form.location.trim()} title={editingConfig ? 'Guardar cambios' : 'Crear configuracion'}>
+            <Icon name="check" size="sm" />
+            <span>{isPending ? 'Guardando...' : editingConfig ? 'Guardar cambios' : 'Crear configuracion'}</span>
           </button>
         </Modal.Footer>
       </Modal>
@@ -319,11 +330,13 @@ export function ConfigsPage() {
           </DetailModal.Section>
 
           <Modal.Footer>
-            <button className="ui-button-muted" onClick={() => { setDetailModalOpen(false); setViewingConfig(null); }}>
-              Cerrar
+            <button className="ui-button-muted" onClick={() => { setDetailModalOpen(false); setViewingConfig(null); }} title="Cerrar">
+              <Icon name="x" size="sm" />
+              <span>Cerrar</span>
             </button>
-            <button className="ui-button" onClick={() => { setDetailModalOpen(false); openEdit(viewingConfig); }}>
-              Editar
+            <button className="ui-button" onClick={() => { setDetailModalOpen(false); openEdit(viewingConfig); }} title="Editar">
+              <Icon name="configs" size="sm" />
+              <span>Editar</span>
             </button>
           </Modal.Footer>
         </DetailModal>

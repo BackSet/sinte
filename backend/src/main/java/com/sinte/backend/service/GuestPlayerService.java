@@ -8,6 +8,7 @@ import com.sinte.backend.domain.enums.MatchStatus;
 import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.repository.GuestPlayerRepository;
+import com.sinte.backend.repository.MatchAttendanceRepository;
 import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserRoleRepository;
@@ -22,13 +23,22 @@ public class GuestPlayerService {
     private final GuestPlayerRepository guestPlayerRepository;
     private final GuestPlayerPositionRepository guestPlayerPositionRepository;
     private final MatchRepository matchRepository;
+    private final MatchAttendanceRepository matchAttendanceRepository;
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
 
-    public GuestPlayerService(GuestPlayerRepository guestPlayerRepository, GuestPlayerPositionRepository guestPlayerPositionRepository, MatchRepository matchRepository, UserRepository userRepository, UserRoleRepository userRoleRepository) {
+    public GuestPlayerService(
+            GuestPlayerRepository guestPlayerRepository,
+            GuestPlayerPositionRepository guestPlayerPositionRepository,
+            MatchRepository matchRepository,
+            MatchAttendanceRepository matchAttendanceRepository,
+            UserRepository userRepository,
+            UserRoleRepository userRoleRepository
+    ) {
         this.guestPlayerRepository = guestPlayerRepository;
         this.guestPlayerPositionRepository = guestPlayerPositionRepository;
         this.matchRepository = matchRepository;
+        this.matchAttendanceRepository = matchAttendanceRepository;
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
     }
@@ -49,10 +59,8 @@ public class GuestPlayerService {
         }
         User creator = userRepository.findById(createdByUserId)
                 .orElseThrow(() -> new DomainException("Usuario no encontrado"));
-        boolean isDtOrAdmin = userRoleRepository.existsByUserIdAndRoleCode(createdByUserId, RoleCode.DT)
-                || userRoleRepository.existsByUserIdAndRoleCode(createdByUserId, RoleCode.ADMIN);
-        if (!isDtOrAdmin) {
-            throw new DomainException("Solo DT o ADMIN pueden agregar invitados");
+        if (!canManageGuestsForMatch(createdByUserId, matchId)) {
+            throw new DomainException("Solo DT/ADMIN o un jugador convocado pueden agregar invitados");
         }
 
         GuestPlayer guest = new GuestPlayer(match, creator, fullName.trim(), nickname != null ? nickname.trim() : null);
@@ -70,7 +78,8 @@ public class GuestPlayerService {
     }
 
     @Transactional(readOnly = true)
-    public List<GuestPlayer> listGuestPlayers(UUID matchId) {
+    public List<GuestPlayer> listGuestPlayers(UUID matchId, UUID requesterUserId) {
+        ensureCanAccessGuestList(matchId, requesterUserId);
         return guestPlayerRepository.findByMatchIdOrderByRespondedAtAsc(matchId);
     }
 
@@ -80,12 +89,10 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer confirmGuest(UUID guestPlayerId, UUID requesterUserId) {
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+    public GuestPlayer confirmGuest(UUID matchId, UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = requireGuestForMatch(matchId, guestPlayerId);
         if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
-            boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
-            if (!isAdmin) {
+            if (!isAdmin(requesterUserId)) {
                 throw new DomainException("Solo el creador o un ADMIN puede confirmar un invitado");
             }
         }
@@ -94,12 +101,10 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer declineGuest(UUID guestPlayerId, UUID requesterUserId) {
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+    public GuestPlayer declineGuest(UUID matchId, UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = requireGuestForMatch(matchId, guestPlayerId);
         if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
-            boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
-            if (!isAdmin) {
+            if (!isAdmin(requesterUserId)) {
                 throw new DomainException("Solo el creador o un ADMIN puede declinar un invitado");
             }
         }
@@ -108,12 +113,10 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer cancelGuest(UUID guestPlayerId, UUID requesterUserId) {
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+    public GuestPlayer cancelGuest(UUID matchId, UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = requireGuestForMatch(matchId, guestPlayerId);
         if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
-            boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
-            if (!isAdmin) {
+            if (!isAdmin(requesterUserId)) {
                 throw new DomainException("Solo el creador o un ADMIN puede cancelar un invitado");
             }
         }
@@ -122,12 +125,10 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public GuestPlayer resetGuestToPending(UUID guestPlayerId, UUID requesterUserId) {
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+    public GuestPlayer resetGuestToPending(UUID matchId, UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = requireGuestForMatch(matchId, guestPlayerId);
         if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
-            boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
-            if (!isAdmin) {
+            if (!isAdmin(requesterUserId)) {
                 throw new DomainException("Solo el creador o un ADMIN puede resetear un invitado");
             }
         }
@@ -136,9 +137,8 @@ public class GuestPlayerService {
     }
 
     @Transactional
-    public void deleteGuest(UUID guestPlayerId, UUID requesterUserId) {
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+    public void deleteGuest(UUID matchId, UUID guestPlayerId, UUID requesterUserId) {
+        GuestPlayer guest = requireGuestForMatch(matchId, guestPlayerId);
         if (!guest.getCreatedBy().getId().equals(requesterUserId)) {
             throw new DomainException("Solo el creador puede eliminar un invitado");
         }
@@ -147,5 +147,37 @@ public class GuestPlayerService {
         }
         guestPlayerPositionRepository.deleteByGuestPlayerId(guestPlayerId);
         guestPlayerRepository.deleteById(guestPlayerId);
+    }
+
+    private GuestPlayer requireGuestForMatch(UUID matchId, UUID guestPlayerId) {
+        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
+                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
+        if (!guest.getMatch().getId().equals(matchId)) {
+            throw new DomainException("El invitado no pertenece al partido indicado");
+        }
+        return guest;
+    }
+
+    private void ensureCanAccessGuestList(UUID matchId, UUID requesterUserId) {
+        if (isAdmin(requesterUserId) || isDt(requesterUserId) || isPlayerCalledToMatch(matchId, requesterUserId)) {
+            return;
+        }
+        throw new DomainException("No tienes permisos para ver invitados de este partido");
+    }
+
+    private boolean canManageGuestsForMatch(UUID requesterUserId, UUID matchId) {
+        return isAdmin(requesterUserId) || isDt(requesterUserId) || isPlayerCalledToMatch(matchId, requesterUserId);
+    }
+
+    private boolean isPlayerCalledToMatch(UUID matchId, UUID userId) {
+        return matchAttendanceRepository.existsByMatchIdAndUserId(matchId, userId);
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRoleRepository.existsByUserIdAndRoleCode(userId, RoleCode.ADMIN);
+    }
+
+    private boolean isDt(UUID userId) {
+        return userRoleRepository.existsByUserIdAndRoleCode(userId, RoleCode.DT);
     }
 }

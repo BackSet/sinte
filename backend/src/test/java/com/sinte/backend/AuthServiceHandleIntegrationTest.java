@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @SpringBootTest
 @Transactional
@@ -25,7 +26,10 @@ class AuthServiceHandleIntegrationTest {
                 "jugador1@test.com",
                 "0991111111",
                 "backset",
-                "Secret123!"
+                "TAG01",
+                10,
+                "Secret123!",
+                List.of(new RegisterRequest.PositionRequest("CENTER_BACK", 1))
         ));
 
         assertThat(registered.playerHandle()).matches("^[a-z0-9_]{3,20}#[A-Z0-9]{4}$");

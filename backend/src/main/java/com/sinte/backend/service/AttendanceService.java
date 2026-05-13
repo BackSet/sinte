@@ -6,6 +6,8 @@ import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.enums.AttendanceStatus;
 import com.sinte.backend.domain.enums.MatchStatus;
 import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.repository.UserRoleRepository;
+import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.service.dto.AttendanceResponseRequest;
 import java.util.List;
 import java.util.UUID;
@@ -16,9 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AttendanceService {
 
     private final MatchAttendanceRepository matchAttendanceRepository;
+    private final UserRoleRepository userRoleRepository;
 
-    public AttendanceService(MatchAttendanceRepository matchAttendanceRepository) {
+    public AttendanceService(MatchAttendanceRepository matchAttendanceRepository, UserRoleRepository userRoleRepository) {
         this.matchAttendanceRepository = matchAttendanceRepository;
+        this.userRoleRepository = userRoleRepository;
     }
 
     @Transactional
@@ -68,7 +72,18 @@ public class AttendanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<MatchAttendance> getAttendanceByMatch(UUID matchId) {
+    public List<MatchAttendance> getAttendanceByMatch(UUID matchId, UUID requesterUserId) {
+        ensureCanAccessMatch(requesterUserId, matchId);
         return matchAttendanceRepository.findByMatchIdOrderByStatusAsc(matchId);
+    }
+
+    private void ensureCanAccessMatch(UUID requesterUserId, UUID matchId) {
+        boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
+        boolean isDt = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.DT);
+        boolean isCalledPlayer = matchAttendanceRepository.existsByMatchIdAndUserId(matchId, requesterUserId);
+        if (isAdmin || isDt || isCalledPlayer) {
+            return;
+        }
+        throw new DomainException("No tienes permisos para ver asistencias de este partido");
     }
 }

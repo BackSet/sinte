@@ -5,6 +5,7 @@ import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { Modal } from '../../components/ui/Modal'
 import { FormField } from '../../components/ui/FormField'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 
 type RoleItem = { id: number; code: string; name: string }
@@ -54,8 +55,9 @@ export function RolesPage() {
         title="Usuarios y roles"
         description="Gestiona permisos por usuario"
         action={
-          <button className="ui-button" onClick={() => setModalOpen(true)}>
-            Asignar rol
+          <button className="ui-button" onClick={() => setModalOpen(true)} title="Asignar rol">
+            <Icon name="user-plus" size="sm" />
+            <span>Asignar rol</span>
           </button>
         }
       >
@@ -115,11 +117,13 @@ export function RolesPage() {
         )}
 
         <Modal.Footer>
-          <button className="ui-button-muted" onClick={() => setModalOpen(false)}>
-            Cancelar
+          <button className="ui-button-muted" onClick={() => setModalOpen(false)} title="Cancelar">
+            <Icon name="x" size="sm" />
+            <span>Cancelar</span>
           </button>
-          <button className="ui-button" onClick={handleAssign} disabled={assignMutation.isPending || !userId}>
-            {assignMutation.isPending ? 'Asignando...' : 'Asignar'}
+          <button className="ui-button" onClick={handleAssign} disabled={assignMutation.isPending || !userId} title="Asignar">
+            <Icon name="check" size="sm" />
+            <span>{assignMutation.isPending ? 'Asignando...' : 'Asignar'}</span>
           </button>
         </Modal.Footer>
       </Modal>

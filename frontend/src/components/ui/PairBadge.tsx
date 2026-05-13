@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { PLAYER_POSITION_OPTIONS } from '../../lib/player-positions'
 import { Icon } from './Icon'
 
@@ -14,6 +15,19 @@ const POSITION_COLORS: Record<string, string> = {
   STRIKER: '#EC4899',
 }
 
+const POSITION_COLORS_DARK: Record<string, string> = {
+  GOALKEEPER: '#60A5FA',
+  CENTER_BACK: '#34D399',
+  LEFT_BACK: '#34D399',
+  RIGHT_BACK: '#34D399',
+  DEFENSIVE_MIDFIELDER: '#FBBF24',
+  CENTRAL_MIDFIELDER: '#FBBF24',
+  ATTACKING_MIDFIELDER: '#F87171',
+  LEFT_WINGER: '#A78BFA',
+  RIGHT_WINGER: '#A78BFA',
+  STRIKER: '#F472B6',
+}
+
 const POSITION_LABELS: Record<string, string> = Object.fromEntries(
   PLAYER_POSITION_OPTIONS.map((opt) => [opt.value, opt.label]),
 )
@@ -27,7 +41,18 @@ export type PairBadgeProps = {
 }
 
 export function PairBadge({ playerA, playerB, positionCode, pairNumber, onDelete }: PairBadgeProps) {
-  const color = POSITION_COLORS[positionCode] ?? '#6B7280'
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  const colors = isDark ? POSITION_COLORS_DARK : POSITION_COLORS
+  const color = colors[positionCode] ?? (isDark ? '#9CA3AF' : '#6B7280')
   const positionLabel = POSITION_LABELS[positionCode] ?? positionCode
 
   return (

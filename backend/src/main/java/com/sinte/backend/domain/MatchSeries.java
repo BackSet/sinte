@@ -34,9 +34,6 @@ public class MatchSeries {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    @Column(nullable = false, length = 60)
-    private String timezone;
-
     @ManyToOne
     @JoinColumn(name = "config_id")
     private MatchConfig config;
@@ -55,14 +52,12 @@ public class MatchSeries {
             String defaultTitle,
             LocalDate startDate,
             LocalDate endDate,
-            String timezone,
             MatchConfig config
     ) {
         this.createdBy = createdBy;
         this.defaultTitle = defaultTitle;
         this.startDate = startDate;
         this.endDate = endDate;
-        this.timezone = timezone;
         this.config = config;
     }
 
@@ -92,7 +87,7 @@ public class MatchSeries {
     }
 
     public String getTimezone() {
-        return timezone;
+        return config != null ? config.getTimezone() : "America/Bogota";
     }
 
     public MatchConfig getConfig() {
@@ -117,9 +112,8 @@ public class MatchSeries {
         this.endDate = null;
     }
 
-    public void updateMetadata(String defaultTitle, String timezone) {
+    public void updateMetadata(String defaultTitle) {
         this.defaultTitle = defaultTitle;
-        this.timezone = timezone;
     }
 
     public void setConfig(MatchConfig config) {

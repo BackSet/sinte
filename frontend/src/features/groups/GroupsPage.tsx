@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/Modal'
 import { FormField } from '../../components/ui/FormField'
 import { PlayerSelector } from '../../components/ui/PlayerSelector'
 import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
 
 type GroupItem = {
@@ -152,8 +153,9 @@ export function GroupsPage() {
         title="Grupos"
         description="Organiza jugadores por grupos para convocatorias y avisos"
         action={
-          <button className="ui-button" onClick={() => setCreateModalOpen(true)}>
-            Nuevo grupo
+          <button className="ui-button" onClick={() => setCreateModalOpen(true)} title="Nuevo grupo">
+            <Icon name="user-plus" size="sm" />
+            <span>Nuevo grupo</span>
           </button>
         }
       >
@@ -176,15 +178,16 @@ export function GroupsPage() {
                 label: '',
                 className: 'text-right',
                 render: (group) => (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <button className="ui-button-muted" onClick={() => openMembers(group)}>
-                      Ver miembros
+                  <div className="flex justify-end gap-1">
+                    <button className="ui-icon-btn" onClick={() => openMembers(group)} title="Ver miembros">
+                      <Icon name="eye" size="sm" />
                     </button>
                     <button
-                      className={group.active ? 'ui-button-muted' : 'ui-button'}
+                      className={group.active ? 'ui-icon-btn ui-icon-btn-danger' : 'ui-icon-btn'}
                       onClick={() => handleToggleActive(group)}
+                      title={group.active ? 'Desactivar' : 'Activar'}
                     >
-                      {group.active ? 'Desactivar' : 'Activar'}
+                      <Icon name={group.active ? 'x' : 'check'} size="sm" />
                     </button>
                   </div>
                 ),
@@ -198,15 +201,16 @@ export function GroupsPage() {
                     {group.active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="ui-button-muted" onClick={() => openMembers(group)}>
-                    Ver miembros
+                <div className="flex flex-wrap gap-1">
+                  <button className="ui-icon-btn" onClick={() => openMembers(group)} title="Ver miembros">
+                    <Icon name="eye" size="sm" />
                   </button>
                   <button
-                    className={group.active ? 'ui-button-muted' : 'ui-button'}
+                    className={group.active ? 'ui-icon-btn ui-icon-btn-danger' : 'ui-icon-btn'}
                     onClick={() => handleToggleActive(group)}
+                    title={group.active ? 'Desactivar' : 'Activar'}
                   >
-                    {group.active ? 'Desactivar' : 'Activar'}
+                    <Icon name={group.active ? 'x' : 'check'} size="sm" />
                   </button>
                 </div>
               </div>
@@ -240,11 +244,13 @@ export function GroupsPage() {
         )}
 
         <Modal.Footer>
-          <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setGroupName(''); }}>
-            Cancelar
+          <button className="ui-button-muted" onClick={() => { setCreateModalOpen(false); setGroupName(''); }} title="Cancelar">
+            <Icon name="x" size="sm" />
+            <span>Cancelar</span>
           </button>
-          <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !groupName.trim()}>
-            {createMutation.isPending ? 'Creando...' : 'Crear grupo'}
+          <button className="ui-button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !groupName.trim()} title="Crear grupo">
+            <Icon name="check" size="sm" />
+            <span>{createMutation.isPending ? 'Creando...' : 'Crear grupo'}</span>
           </button>
         </Modal.Footer>
       </Modal>
@@ -291,8 +297,9 @@ export function GroupsPage() {
                   onChange={(e) => setManualHandle(e.target.value)}
                   required
                 />
-                <button className="ui-button shrink-0" type="submit" disabled={addMemberMutation.isPending}>
-                  Agregar
+                <button className="ui-button shrink-0" type="submit" disabled={addMemberMutation.isPending} title="Agregar">
+                  <Icon name="user-plus" size="sm" />
+                  <span>Agregar</span>
                 </button>
               </form>
             )}
@@ -331,11 +338,12 @@ export function GroupsPage() {
                     className: 'text-right',
                     render: (member) => (
                       <button
-                        className="ui-button-muted"
+                        className="ui-icon-btn ui-icon-btn-danger"
                         onClick={() => handleRemoveMember(member)}
                         disabled={removeMemberMutation.isPending}
+                        title="Quitar miembro"
                       >
-                        {removeMemberMutation.isPending ? 'Quitando...' : 'Quitar'}
+                        <Icon name="trash" size="sm" />
                       </button>
                     ),
                   },

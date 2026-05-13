@@ -74,7 +74,7 @@ public class AuthController {
     ) {
         java.util.UUID userId = SecurityUtils.currentUserId();
         List<UserPositionService.PositionAssignment> serviceAssignments = assignments.stream()
-                .map(a -> new UserPositionService.PositionAssignment(a.positionCode(), a.priority()))
+                .map(a -> new UserPositionService.PositionAssignment(a.positionCode(), (short) a.priority()))
                 .toList();
         return ResponseEntity.ok(userPositionService.setUserPositions(userId, serviceAssignments));
     }

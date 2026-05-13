@@ -189,7 +189,8 @@ public class MatchesController {
     @GetMapping("/{matchId}/pairs/preview")
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<PairingPreviewResponse> previewPairs(@PathVariable UUID matchId) {
-        MatchPairingService.PairingResult result = pairingService.previewPairs(matchId);
+        UUID userId = SecurityUtils.currentUserId();
+        MatchPairingService.PairingResult result = pairingService.previewPairs(matchId, userId);
         return ResponseEntity.ok(toPairingPreviewResponse(result));
     }
 
@@ -207,8 +208,10 @@ public class MatchesController {
             @PathVariable UUID matchId,
             @Valid @RequestBody ManualPairRequest request
     ) {
+        UUID userId = SecurityUtils.currentUserId();
         MatchPairingService.PairingResult result = pairingService.createManualPair(
                 matchId,
+                userId,
                 request.playerAId(),
                 request.playerBId(),
                 request.guestPlayerAId(),
@@ -221,21 +224,24 @@ public class MatchesController {
     @DeleteMapping("/{matchId}/pairs/{pairId}")
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<Void> deletePair(@PathVariable UUID matchId, @PathVariable UUID pairId) {
-        pairingService.deletePair(matchId, pairId);
+        UUID userId = SecurityUtils.currentUserId();
+        pairingService.deletePair(matchId, pairId, userId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{matchId}/pairs/draw")
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<Void> drawAndAssignTeams(@PathVariable UUID matchId) {
-        pairingService.executeDrawAndAssignTeams(matchId);
+        UUID userId = SecurityUtils.currentUserId();
+        pairingService.executeDrawAndAssignTeams(matchId, userId);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{matchId}/pairs")
     @PreAuthorize("hasAnyRole('DT','ADMIN')")
     public ResponseEntity<Void> resetPairs(@PathVariable UUID matchId) {
-        pairingService.resetPairsAndTeams(matchId);
+        UUID userId = SecurityUtils.currentUserId();
+        pairingService.resetPairsAndTeams(matchId, userId);
         return ResponseEntity.noContent().build();
     }
 

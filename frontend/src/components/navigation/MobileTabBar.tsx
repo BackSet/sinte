@@ -33,7 +33,6 @@ export function MobileTabBar({ isAdmin, canManageSeries }: MobileTabBarProps) {
         ...(canManageSeries ? [{ to: '/my-groups', label: 'Mis grupos', icon: 'groups' as const }] : []),
         ...(isAdmin ? [{ to: '/users', label: 'Usuarios', icon: 'users' as const }] : []),
         ...(isAdmin ? [{ to: '/roles', label: 'Roles', icon: 'roles' as const }] : []),
-        ...(isAdmin ? [{ to: '/admin/email-queue', label: 'Cola de correos', icon: 'admin' as const }] : []),
       ],
     [canManageSeries, isAdmin],
   )

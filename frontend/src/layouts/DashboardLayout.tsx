@@ -91,19 +91,6 @@ export function DashboardLayout() {
               </div>
             )}
 
-            {isAdmin && (
-              <NavLink
-                to="/admin/email-queue"
-                className={({ isActive }) =>
-                  `ui-nav-link ${isActive ? 'ui-nav-link-active' : ''}`
-                }
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Icon name="admin" size="sm" />
-                  Cola de correos
-                </span>
-              </NavLink>
-            )}
           </nav>
         </aside>
 
