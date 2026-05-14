@@ -68,6 +68,7 @@ export function RolesPage() {
             data={usersQuery.data}
             rowKey={(user) => user.id}
             emptyMessage="Sin usuarios para mostrar."
+            emptyIcon="users"
             columns={[
               { key: 'user', label: 'Usuario', render: (user) => user.fullName },
               { key: 'roles', label: 'Roles', render: (user) => user.roles.join(', ') || '-' },

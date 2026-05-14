@@ -739,7 +739,7 @@
     margin-inline: auto;
     width: min(100%, 1200px);
     padding-inline: 0.75rem;
-    padding-bottom: 5.5rem;
+    padding-bottom: 1.25rem;
   }
 
   .ui-toolbar {

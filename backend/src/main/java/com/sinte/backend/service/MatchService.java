@@ -359,11 +359,11 @@ public class MatchService {
     public List<Match> listMatches(OffsetDateTime from, OffsetDateTime to, MatchStatus status) {
         if (from != null && to != null) {
             if (status != null) {
-                return matchRepository.findByStartsAtBetweenAndStatusOrderByStartsAtAsc(from, to, status);
+                return matchRepository.findByStartsAtBetweenAndStatusOrderByCreatedAtDescStartsAtDesc(from, to, status);
             }
-            return matchRepository.findByStartsAtBetweenOrderByStartsAtAsc(from, to);
+            return matchRepository.findByStartsAtBetweenOrderByCreatedAtDescStartsAtDesc(from, to);
         }
-        return matchRepository.findAll();
+        return matchRepository.findAllByOrderByCreatedAtDescStartsAtDesc();
     }
 
     @Transactional(readOnly = true)
@@ -445,7 +445,7 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public List<MatchSeries> listSeries() {
-        return matchSeriesRepository.findAll();
+        return matchSeriesRepository.findAllByOrderByCreatedAtDesc();
     }
 
     @Transactional

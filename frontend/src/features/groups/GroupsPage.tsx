@@ -166,6 +166,7 @@ export function GroupsPage() {
             data={groupsQuery.data}
             rowKey={(group) => group.id}
             emptyMessage="No hay grupos registrados."
+            emptyIcon="groups"
             columns={[
               { key: 'name', label: 'Nombre', render: (group) => group.name },
               { key: 'status', label: 'Estado', render: (group) => (
@@ -325,13 +326,26 @@ export function GroupsPage() {
                 data={membersQuery.data}
                 rowKey={(member) => member.userId}
                 emptyMessage="Sin miembros."
+                emptyIcon="users"
                 columns={[
-                  { key: 'name', label: 'Nombre', render: (member) => member.fullName },
-                  { key: 'email', label: 'Correo', render: (member) => member.email },
-                  { key: 'handle', label: 'Codigo', render: (member) => (
-                    <span className="ui-badge">{member.playerHandle ?? '-'}</span>
+                  { key: 'name', label: 'Nombre', render: (member) => (
+                    <div>
+                      <p className="font-medium">{member.fullName}</p>
+                      <p className="ui-text-muted text-xs">{member.email}</p>
+                    </div>
                   )},
-                  ...(membersQuery.data?.some(m => m.rol) ? [{ key: 'rol', label: 'Rol', render: (member: GroupMemberItem) => member.rol ? <span className="ui-badge">{member.rol}</span> : '-' }] : []),
+                  ...(membersQuery.data?.some(m => m.rol || m.playerHandle)
+                    ? [{
+                        key: 'badges',
+                        label: 'Codigo / Rol',
+                        render: (member: GroupMemberItem) => (
+                          <div className="flex items-center gap-1">
+                            {member.playerHandle && <span className="ui-badge">{member.playerHandle}</span>}
+                            {member.rol && <span className="ui-badge ui-badge-muted">{member.rol}</span>}
+                          </div>
+                        )
+                      }]
+                    : []),
                   {
                     key: 'actions',
                     label: '',
@@ -351,16 +365,22 @@ export function GroupsPage() {
                 renderMobileCard={(member) => (
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold">{member.fullName}</p>
-                      <span className="ui-badge">{member.playerHandle ?? '-'}</span>
+                      <div>
+                        <p className="font-semibold">{member.fullName}</p>
+                        <p className="ui-text-muted text-xs">{member.email}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {member.playerHandle && <span className="ui-badge">{member.playerHandle}</span>}
+                        {member.rol && <span className="ui-badge ui-badge-muted">{member.rol}</span>}
+                      </div>
                     </div>
-                    <p className="ui-text-muted">{member.email}</p>
                     <button
-                      className="ui-button-muted"
+                      className="ui-icon-btn ui-icon-btn-danger"
                       onClick={() => handleRemoveMember(member)}
                       disabled={removeMemberMutation.isPending}
+                      title="Quitar del grupo"
                     >
-                      Quitar del grupo
+                      <Icon name="trash" size="sm" />
                     </button>
                   </div>
                 )}

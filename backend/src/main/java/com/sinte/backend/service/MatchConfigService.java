@@ -42,7 +42,7 @@ public class MatchConfigService {
 
     @Transactional(readOnly = true)
     public List<MatchConfig> listConfigs() {
-        return matchConfigRepository.findAll();
+        return matchConfigRepository.findAllByOrderByCreatedAtDesc();
     }
 
     @Transactional

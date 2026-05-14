@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface MatchAttendanceRepository extends JpaRepository<MatchAttendance, UUID> {
     List<MatchAttendance> findByMatchIdOrderByStatusAsc(UUID matchId);
@@ -16,7 +18,15 @@ public interface MatchAttendanceRepository extends JpaRepository<MatchAttendance
 
     boolean existsByMatchIdAndUserId(UUID matchId, UUID userId);
 
-    List<MatchAttendance> findByUserIdOrderByRespondedAtDesc(UUID userId);
+    @Query("""
+           SELECT ma
+           FROM MatchAttendance ma
+           JOIN FETCH ma.match m
+           JOIN FETCH ma.user u
+           WHERE u.id = :userId
+           ORDER BY m.createdAt DESC, m.startsAt DESC
+           """)
+    List<MatchAttendance> findByUserIdForMyAttendanceList(@Param("userId") UUID userId);
 
     long countByMatchIdAndStatus(UUID matchId, AttendanceStatus status);
 

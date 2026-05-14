@@ -27,6 +27,7 @@ function positionLabel(code: string | undefined | null): string {
 type MatchItem = {
   id: string
   createdByName?: string
+  createdAt?: string
   title: string
   location?: string
   startsAt: string
@@ -454,9 +455,14 @@ export function MatchesPage() {
     }
   }
 
-  const visibleMatches = (matchesQuery.data ?? []).filter((match) =>
-    statusFilter === 'ALL' ? true : match.status === statusFilter,
-  )
+  const visibleMatches = (matchesQuery.data ?? [])
+    .filter((match) => (statusFilter === 'ALL' ? true : match.status === statusFilter))
+    .slice()
+    .sort((left, right) => {
+      const leftTime = new Date(left.createdAt ?? left.startsAt).getTime()
+      const rightTime = new Date(right.createdAt ?? right.startsAt).getTime()
+      return rightTime - leftTime
+    })
 
   const detailTabs = [
     { label: 'Roster', active: detailTab === 'roster', onClick: () => setDetailTab('roster') },
@@ -507,27 +513,42 @@ export function MatchesPage() {
             data={visibleMatches}
             rowKey={(match) => match.id}
             emptyMessage="No hay partidos creados."
+            emptyIcon="matches"
             columns={[
-              { key: 'title', label: 'Titulo', render: (match) => match.title },
-              { key: 'location', label: 'Ubicacion', render: (match) => match.location ?? '-' },
-              { key: 'start', label: 'Inicio', render: (match) => toDateTimeLocalValue(match.startsAt).replace('T', ' ') },
-              { key: 'status', label: 'Estado', render: (match) => {
+              { key: 'title', label: 'Titulo', render: (match) => (
+                <div>
+                  <p className="font-medium">{match.title}</p>
+                  {isManager && <p className="ui-text-muted text-xs">{match.createdByName ?? '-'}</p>}
+                </div>
+              )},
+              { key: 'info', label: 'Ubicacion / Inicio', render: (match) => (
+                <div>
+                  <p className="text-sm">{match.location ?? '-'}</p>
+                  <p className="ui-text-muted text-xs">{toDateTimeLocalValue(match.startsAt).replace('T', ' ')}</p>
+                </div>
+              )},
+              { key: 'status', label: 'Estado / Origen', render: (match) => {
                 const isCancelled = match.status === 'CANCELLED'
                 const isClosed = isMatchClosed(match) && match.status === 'SCHEDULED'
                 return (
-                  <span className={`ui-badge ${isCancelled ? 'ui-badge-danger' : isClosed ? 'ui-badge-muted' : 'ui-badge-success'}`}>
-                    {statusLabel(match)}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`ui-badge ${isCancelled ? 'ui-badge-danger' : isClosed ? 'ui-badge-muted' : 'ui-badge-success'}`}>
+                      {statusLabel(match)}
+                    </span>
+                    <span className="ui-text-muted text-xs">{sourceTypeLabel(match.sourceType)}</span>
+                  </div>
                 )
               }},
-              ...(isManager ? [{ key: 'owner', label: 'Creado por', render: (match: MatchItem) => match.createdByName ?? '-' }] : []),
-              { key: 'roster', label: 'Plantilla', render: (match) => `${match.confirmedCount} / ${match.targetPlayers ?? '-'}` },
-              { key: 'source', label: 'Origen', render: (match) => sourceTypeLabel(match.sourceType) },
-              { key: 'groups', label: 'Grupos', render: (match) =>
-                match.targetGroups && match.targetGroups.length > 0
-                  ? match.targetGroups.map((group) => group.name).join(', ')
-                  : 'Todos'
-              },
+              { key: 'roster', label: 'Plantilla / Grupos', render: (match) => (
+                <div>
+                  <p className="text-sm">{match.confirmedCount} / {match.targetPlayers ?? '-'}</p>
+                  <p className="ui-text-muted text-xs">
+                    {match.targetGroups && match.targetGroups.length > 0
+                      ? match.targetGroups.map((g) => g.name).join(', ')
+                      : 'Todos'}
+                  </p>
+                </div>
+              )},
               {
                 key: 'actions',
                 label: '',
@@ -553,15 +574,18 @@ export function MatchesPage() {
             ]}
             renderMobileCard={(match) => (
               <div className="space-y-2 text-sm">
-                <p className="font-semibold">{match.title}</p>
-                <p className="ui-text-muted">Ubicacion: {match.location ?? '-'}</p>
-                <p className="ui-text-muted">Inicio: {toDateTimeLocalValue(match.startsAt).replace('T', ' ')}</p>
-                <p className="ui-text-muted">Plantilla: {match.confirmedCount} / {match.targetPlayers ?? '-'}{isMatchClosed(match) && match.status === 'SCHEDULED' ? ' (Cerrado)' : ''}</p>
-                <p className="ui-text-muted">Origen: {sourceTypeLabel(match.sourceType)}</p>
-                <p className="ui-text-muted">Grupos: {match.targetGroupIds && match.targetGroupIds.length > 0 ? match.targetGroupIds.length : 'Todos'}</p>
-                {match.targetGroups && match.targetGroups.length > 0 && (
-                  <p className="ui-text-muted text-xs">({match.targetGroups.map((group) => group.name).join(', ')})</p>
-                )}
+                <div>
+                  <p className="font-semibold">{match.title}</p>
+                  {isManager && <p className="ui-text-muted text-xs">{match.createdByName ?? '-'}</p>}
+                </div>
+                <p className="ui-text-muted">{match.location ?? '-'} · {toDateTimeLocalValue(match.startsAt).replace('T', ' ')}</p>
+                <p className="ui-text-muted">
+                  {match.confirmedCount} / {match.targetPlayers ?? '-'}{isMatchClosed(match) && match.status === 'SCHEDULED' ? ' (Cerrado)' : ''}
+                  {' · '}
+                  {match.targetGroups && match.targetGroups.length > 0
+                    ? match.targetGroups.map((g) => g.name).join(', ')
+                    : 'Todos'}
+                </p>
                 <div className="flex items-center justify-between gap-2">
                   <span className="ui-text-muted text-xs font-medium uppercase">{statusLabel(match)} | {sourceTypeLabel(match.sourceType)}</span>
                   {isManager && (

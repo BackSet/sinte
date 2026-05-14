@@ -54,7 +54,7 @@ public class GroupService {
     @Transactional(readOnly = true)
     public List<SinteGroup> listGroups(UUID requesterUserId) {
         if (isAdmin(requesterUserId)) {
-            return sinteGroupRepository.findAll();
+            return sinteGroupRepository.findAllByOrderByCreatedAtDesc();
         }
         return sinteGroupRepository.findByCreatedByIdOrderByCreatedAtDesc(requesterUserId);
     }

@@ -59,7 +59,8 @@ export function AttendancePage() {
         <ResponsiveTable
           data={attendanceQuery.data}
           rowKey={(attendance) => attendance.id}
-          emptyMessage="No tienes convocatorias pendientes."
+          emptyMessage="No tienes convocatorias."
+          emptyIcon="attendance"
           columns={[
             {
               key: 'match',

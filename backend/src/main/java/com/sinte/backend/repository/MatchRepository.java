@@ -10,9 +10,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface MatchRepository extends JpaRepository<Match, UUID> {
-    List<Match> findByStartsAtBetweenOrderByStartsAtAsc(OffsetDateTime from, OffsetDateTime to);
+    List<Match> findAllByOrderByCreatedAtDescStartsAtDesc();
 
-    List<Match> findByStartsAtBetweenAndStatusOrderByStartsAtAsc(OffsetDateTime from, OffsetDateTime to, MatchStatus status);
+    List<Match> findByStartsAtBetweenOrderByCreatedAtDescStartsAtDesc(OffsetDateTime from, OffsetDateTime to);
+
+    List<Match> findByStartsAtBetweenAndStatusOrderByCreatedAtDescStartsAtDesc(
+            OffsetDateTime from, OffsetDateTime to, MatchStatus status);
 
     boolean existsBySeriesIdAndStartsAt(UUID seriesId, OffsetDateTime startsAt);
 
@@ -23,7 +26,7 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
            FROM Match m
            JOIN MatchAttendance ma ON ma.match.id = m.id
            WHERE ma.user.id = :userId
-           ORDER BY m.startsAt ASC
+           ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
     List<Match> findUserMatches(@Param("userId") UUID userId);
 
@@ -33,7 +36,7 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
            JOIN MatchAttendance ma ON ma.match.id = m.id
            WHERE ma.user.id = :userId
              AND m.status = :status
-           ORDER BY m.startsAt ASC
+           ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
     List<Match> findUserMatchesByStatus(
             @Param("userId") UUID userId,
@@ -47,7 +50,7 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
            WHERE ma.user.id = :userId
              AND (:from IS NULL OR m.startsAt >= :from)
              AND (:to IS NULL OR m.startsAt <= :to)
-           ORDER BY m.startsAt ASC
+           ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
     List<Match> findUserMatchesByRange(
             @Param("userId") UUID userId,
@@ -63,7 +66,7 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
              AND (:from IS NULL OR m.startsAt >= :from)
              AND (:to IS NULL OR m.startsAt <= :to)
              AND m.status = :status
-           ORDER BY m.startsAt ASC
+           ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
     List<Match> findUserMatchesByRangeAndStatus(
             @Param("userId") UUID userId,

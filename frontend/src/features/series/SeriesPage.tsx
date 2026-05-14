@@ -330,21 +330,28 @@ export function SeriesPage() {
             data={seriesQuery.data}
             rowKey={(series) => series.id}
             emptyMessage="No hay series registradas."
+            emptyIcon="series"
             columns={[
-              { key: 'name', label: 'Nombre', render: (series) => series.defaultTitle },
-              { key: 'period', label: 'Periodo', render: (series) => `${series.startDate} - ${series.endDate ?? 'En curso'}` },
+              { key: 'name', label: 'Nombre / Creado por', render: (series) => (
+                <div>
+                  <p className="font-medium">{series.defaultTitle}</p>
+                  <p className="ui-text-muted text-xs">{series.createdByName ?? '-'}</p>
+                </div>
+              )},
+              { key: 'status', label: 'Estado / Periodo', render: (series) => (
+                <div className="flex items-center gap-1.5">
+                  <span className={`ui-badge ${series.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
+                    {series.active ? 'Activa' : 'Inactiva'}
+                  </span>
+                  <span className="ui-text-muted text-xs">{series.startDate} – {series.endDate ?? 'En curso'}</span>
+                </div>
+              )},
               { key: 'groups', label: 'Grupos', render: (series) =>
                 series.targetGroups && series.targetGroups.length > 0
                   ? series.targetGroups.map((group) => group.name).join(', ')
                   : 'Todos'
               },
-              { key: 'creator', label: 'Creado por', render: (series) => series.createdByName ?? '-' },
               { key: 'rule', label: 'Reglas', render: (series) => series.rules.map((rule) => describeRule(rule)).join(' | ') },
-              { key: 'status', label: 'Estado', render: (series) => (
-                <span className={`ui-badge ${series.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
-                  {series.active ? 'Activa' : 'Inactiva'}
-                </span>
-              )},
               {
                 key: 'actions',
                 label: '',
@@ -369,9 +376,16 @@ export function SeriesPage() {
             ]}
             renderMobileCard={(series) => (
               <div className="space-y-2 text-sm">
-                <p className="font-semibold">{series.defaultTitle}</p>
-                <p className="ui-text-muted">{series.startDate} - {series.endDate ?? 'En curso'}</p>
-                <p className="ui-text-muted">Grupos: {series.targetGroups && series.targetGroups.length > 0 ? series.targetGroups.map((g) => g.name).join(', ') : 'Todos'}</p>
+                <div>
+                  <p className="font-semibold">{series.defaultTitle}</p>
+                  <p className="ui-text-muted text-xs">{series.createdByName ?? '-'}</p>
+                </div>
+                <p className="ui-text-muted">{series.startDate} – {series.endDate ?? 'En curso'} · {series.active ? 'Activa' : 'Inactiva'}</p>
+                <p className="ui-text-muted">
+                  {series.targetGroups && series.targetGroups.length > 0
+                    ? series.targetGroups.map((g) => g.name).join(', ')
+                    : 'Todos'}
+                </p>
                 <div className="ui-card p-2 text-sm">
                   {series.rules.map((rule, i) => <p key={`${series.id}-${i}`}>{describeRule(rule)}</p>)}
                 </div>

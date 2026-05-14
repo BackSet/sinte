@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { IconName } from './Icon'
 import { Icon } from './Icon'
 
 type ResponsiveColumn<T> = {
@@ -13,6 +14,7 @@ type ResponsiveTableProps<T> = {
   columns: Array<ResponsiveColumn<T>>
   rowKey: (item: T) => string
   emptyMessage: string
+  emptyIcon?: IconName
   renderMobileCard: (item: T) => ReactNode
 }
 
@@ -21,12 +23,13 @@ export function ResponsiveTable<T>({
   columns,
   rowKey,
   emptyMessage,
+  emptyIcon = 'search',
   renderMobileCard,
 }: ResponsiveTableProps<T>) {
   if (!data.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <Icon name="search" size="lg" className="ui-text-muted mb-2" />
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <Icon name={emptyIcon} size="lg" className="ui-text-muted mb-3 opacity-90" />
         <p className="ui-text-muted text-sm">{emptyMessage}</p>
       </div>
     )
@@ -36,7 +39,7 @@ export function ResponsiveTable<T>({
     <>
       <div className="space-y-3 md:hidden">
         {data.map((item) => (
-          <article key={rowKey(item)} className="ui-muted-surface p-3.5">
+          <article key={rowKey(item)} className="ui-muted-surface p-3 sm:p-3.5">
             {renderMobileCard(item)}
           </article>
         ))}

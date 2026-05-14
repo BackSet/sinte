@@ -46,7 +46,7 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('PLAYER','DT','ADMIN')")
     public ResponseEntity<List<AttendanceResponse>> myAttendance() {
         UUID userId = SecurityUtils.currentUserId();
-        List<AttendanceResponse> attendance = matchAttendanceRepository.findByUserIdOrderByRespondedAtDesc(userId).stream()
+        List<AttendanceResponse> attendance = matchAttendanceRepository.findByUserIdForMyAttendanceList(userId).stream()
                 .map(this::toResponse)
                 .toList();
         return ResponseEntity.ok(attendance);

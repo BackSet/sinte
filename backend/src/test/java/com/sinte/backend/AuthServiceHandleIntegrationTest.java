@@ -26,7 +26,7 @@ class AuthServiceHandleIntegrationTest {
                 "jugador1@test.com",
                 "0991111111",
                 "backset",
-                "TAG01",
+                "TAG1",
                 10,
                 "Secret123!",
                 List.of(new RegisterRequest.PositionRequest("CENTER_BACK", 1))

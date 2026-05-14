@@ -175,11 +175,20 @@ export function ConfigsPage() {
             data={configsQuery.data}
             rowKey={(c) => c.id}
             emptyMessage="No hay configuraciones creadas."
+            emptyIcon="configs"
             columns={[
-              { key: 'location', label: 'Ubicacion', render: (c) => c.location },
-              { key: 'target', label: 'Plantilla', render: (c) => c.targetPlayers },
-              { key: 'duration', label: 'Duracion', render: (c) => `${c.durationMinutes} min` },
-              { key: 'timezone', label: 'Zona horaria', render: (c) => c.timezone },
+              { key: 'location', label: 'Ubicacion · Plantilla', render: (c) => (
+                <div>
+                  <p className="text-sm">{c.location}</p>
+                  <p className="ui-text-muted text-xs">{c.targetPlayers} jugadores</p>
+                </div>
+              )},
+              { key: 'duration', label: 'Duracion · Zona', render: (c) => (
+                <div>
+                  <p className="text-sm">{c.durationMinutes} min</p>
+                  <p className="ui-text-muted text-xs">{c.timezone}</p>
+                </div>
+              )},
               {
                 key: 'actions',
                 label: '',
@@ -202,8 +211,8 @@ export function ConfigsPage() {
             renderMobileCard={(c) => (
               <div className="space-y-2 text-sm">
                 <p className="font-semibold">{c.location}</p>
-                <p className="ui-text-muted">Plantilla: {c.targetPlayers} jugadores</p>
-                <p className="ui-text-muted">Duracion: {c.durationMinutes} min | {c.timezone}</p>
+                <p className="ui-text-muted">{c.targetPlayers} jugadores · {c.durationMinutes} min</p>
+                <p className="ui-text-muted text-xs">{c.timezone}</p>
                 {c.description && <p className="ui-text-muted">{c.description}</p>}
                 <div className="flex gap-1">
                   <button className="ui-icon-btn" onClick={() => openDetail(c)} title="Ver">

@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MatchSeriesRepository extends JpaRepository<MatchSeries, UUID> {
     List<MatchSeries> findByActiveTrue();
+
+    List<MatchSeries> findAllByOrderByCreatedAtDesc();
 }

@@ -52,7 +52,7 @@ class GroupMatchTargetingIntegrationTest {
                 "dt@test.com",
                 "0992222222",
                 "dtmaster",
-                "DT001",
+                "DT01",
                 1,
                 "Secret123!",
                 List.of(new RegisterRequest.PositionRequest("CENTER_BACK", 1))
@@ -62,7 +62,7 @@ class GroupMatchTargetingIntegrationTest {
                 "player.group@test.com",
                 "0993333333",
                 "grupo",
-                "GR001",
+                "GR01",
                 2,
                 "Secret123!",
                 List.of(new RegisterRequest.PositionRequest("LEFT_BACK", 1))
@@ -72,7 +72,7 @@ class GroupMatchTargetingIntegrationTest {
                 "player.out@test.com",
                 "0994444444",
                 "fuera",
-                "FU001",
+                "FU01",
                 3,
                 "Secret123!",
                 List.of(new RegisterRequest.PositionRequest("RIGHT_BACK", 1))

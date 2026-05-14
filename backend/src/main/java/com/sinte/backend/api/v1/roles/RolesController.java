@@ -9,6 +9,7 @@ import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.service.DomainException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,7 @@ public class RolesController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<RoleResponse>> listRoles() {
         List<RoleResponse> roles = roleRepository.findAll().stream()
+                .sorted(Comparator.comparing(r -> r.getCode().name()))
                 .map(role -> new RoleResponse(role.getId(), role.getCode().name(), role.getName()))
                 .toList();
         return ResponseEntity.ok(roles);

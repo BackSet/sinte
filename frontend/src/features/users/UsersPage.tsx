@@ -174,6 +174,7 @@ export function UsersPage() {
             data={usersQuery.data}
             rowKey={(user) => user.id}
             emptyMessage="Sin usuarios registrados."
+            emptyIcon="users"
             columns={[
               { key: 'name', label: 'Nombre', render: (user) => (
                 <div>
@@ -181,15 +182,19 @@ export function UsersPage() {
                   <p className="ui-text-muted text-xs">{user.email}</p>
                 </div>
               )},
-              { key: 'phone', label: 'Telefono', render: (user) => user.phone },
-              { key: 'handle', label: 'Codigo', render: (user) => (
-                <span className="ui-badge">{user.playerHandle ?? '-'}</span>
+              { key: 'contact', label: 'Contacto', render: (user) => (
+                <div>
+                  <p className="text-sm">{user.phone}</p>
+                  <span className="ui-badge text-xs">{user.playerHandle ?? '-'}</span>
+                </div>
               )},
-              { key: 'roles', label: 'Roles', render: (user) => user.roles.join(', ') || '-' },
-              { key: 'status', label: 'Estado', render: (user) => (
-                <span className={`ui-badge ${user.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
-                  {user.active ? 'Activo' : 'Inactivo'}
-                </span>
+              { key: 'roles', label: 'Roles / Estado', render: (user) => (
+                <div>
+                  <p className="text-sm">{user.roles.join(', ') || '-'}</p>
+                  <span className={`ui-badge ${user.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
+                    {user.active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
               )},
               {
                 key: 'actions',
@@ -213,14 +218,15 @@ export function UsersPage() {
             renderMobileCard={(user) => (
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold">{user.fullName}</p>
+                  <div>
+                    <p className="font-semibold">{user.fullName}</p>
+                    <p className="ui-text-muted text-xs">{user.email}</p>
+                  </div>
                   <span className={`ui-badge ${user.active ? 'ui-badge-success' : 'ui-badge-muted'}`}>
                     {user.active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                <p className="ui-text-muted">{user.email}</p>
-                <p className="ui-text-muted">Telefono: {user.phone}</p>
-                <p className="ui-text-muted">Codigo: {user.playerHandle ?? '-'}</p>
+                <p className="ui-text-muted">{user.phone} · <span className="ui-badge text-xs">{user.playerHandle ?? '-'}</span></p>
                 <p className="ui-text-muted">Roles: {user.roles.join(', ') || '-'}</p>
                 <div className="flex flex-wrap gap-1">
                   <button className="ui-icon-btn" onClick={() => openDetail(user)} title="Ver">
