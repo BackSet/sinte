@@ -31,7 +31,7 @@ public class User {
     @Column(length = 80)
     private String nickname;
 
-    @Column(name = "nickname_tag", length = 4)
+    @Column(name = "nickname_tag", length = 10)
     private String nicknameTag;
 
     @Column(name = "shirt_number", nullable = false)
