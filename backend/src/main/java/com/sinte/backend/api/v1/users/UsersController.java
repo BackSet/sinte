@@ -58,12 +58,21 @@ public class UsersController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String role
     ) {
-        List<UserResponse> users = userRepository.findAll(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<UserResponse> users;
+        if (role != null && !role.isBlank()) {
+            users = userRepository.findByRole(role)
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+        } else {
+            users = userRepository.findAll(PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
         return ResponseEntity.ok(users);
     }
 

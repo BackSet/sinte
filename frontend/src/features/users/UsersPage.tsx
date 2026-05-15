@@ -50,10 +50,14 @@ export function UsersPage() {
   const [editingPositionsUser, setEditingPositionsUser] = useState<UserItem | null>(null)
   const [userForm, setUserForm] = useState(emptyUserForm())
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
+  const [roleFilter, setRoleFilter] = useState<string>('')
 
   const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => (await apiClient.get<UserItem[]>('/api/v1/users?page=0&size=100')).data,
+    queryKey: ['users', roleFilter],
+    queryFn: async () => {
+      const roleParam = roleFilter ? `&role=${roleFilter}` : ''
+      return (await apiClient.get<UserItem[]>(`/api/v1/users?page=0&size=100${roleParam}`)).data
+    },
   })
 
   const currentPositionsQuery = useQuery({
@@ -161,10 +165,23 @@ export function UsersPage() {
         title="Usuarios"
         description="Gestiona jugadores y staff del sistema"
         action={
-          <button className="ui-button" onClick={() => setCreateModalOpen(true)} title="Nuevo usuario">
-            <Icon name="user-plus" size="sm" />
-            <span>Nuevo usuario</span>
-          </button>
+          <div className="flex gap-2">
+            <select
+              className="ui-input min-w-32"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filtrar por rol"
+            >
+              <option value="">Todos los roles</option>
+              <option value="PLAYER">Jugadores</option>
+              <option value="DT">DT</option>
+              <option value="ADMIN">Administradores</option>
+            </select>
+            <button className="ui-button" onClick={() => setCreateModalOpen(true)} title="Nuevo usuario">
+              <Icon name="user-plus" size="sm" />
+              <span>Nuevo usuario</span>
+            </button>
+          </div>
         }
       >
         {usersQuery.isLoading && <p className="ui-text-muted mt-3 text-sm">Cargando usuarios...</p>}
