@@ -94,6 +94,13 @@ public class MatchesController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{matchId}/delete")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable UUID matchId) {
+        matchService.deleteMatch(matchId, SecurityUtils.currentUserId());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{matchId}/confirmed")
     @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
     public ResponseEntity<ConfirmedPlayersResponse> confirmedPlayers(@PathVariable UUID matchId) {

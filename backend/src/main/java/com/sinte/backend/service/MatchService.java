@@ -22,6 +22,7 @@ import com.sinte.backend.domain.enums.NotificationType;
 import com.sinte.backend.domain.enums.RecurrenceType;
 import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.repository.MatchConfigRepository;
+import com.sinte.backend.repository.MatchPairRepository;
 import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.MatchAttendanceRepository;
 import com.sinte.backend.repository.MatchSeriesTargetGroupRepository;
@@ -35,6 +36,7 @@ import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.repository.GuestPlayerRepository;
+import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.service.dto.CreateMatchRequest;
 import com.sinte.backend.service.dto.CreateMatchSeriesRequest;
@@ -72,6 +74,7 @@ public class MatchService {
     private final UserPositionRepository userPositionRepository;
     private final GuestPlayerRepository guestPlayerRepository;
     private final GuestPlayerPositionRepository guestPlayerPositionRepository;
+    private final MatchPairRepository matchPairRepository;
     private final AttendanceService attendanceService;
     private final NotificationService notificationService;
     private final GroupService groupService;
@@ -93,6 +96,7 @@ public class MatchService {
             UserPositionRepository userPositionRepository,
             GuestPlayerRepository guestPlayerRepository,
             GuestPlayerPositionRepository guestPlayerPositionRepository,
+            MatchPairRepository matchPairRepository,
             AttendanceService attendanceService,
             NotificationService notificationService,
             GroupService groupService,
@@ -113,6 +117,7 @@ public class MatchService {
         this.userPositionRepository = userPositionRepository;
         this.guestPlayerRepository = guestPlayerRepository;
         this.guestPlayerPositionRepository = guestPlayerPositionRepository;
+        this.matchPairRepository = matchPairRepository;
         this.attendanceService = attendanceService;
         this.notificationService = notificationService;
         this.groupService = groupService;
@@ -441,6 +446,33 @@ public class MatchService {
         }
         match.updateStatus(MatchStatus.CANCELLED);
         matchRepository.save(match);
+    }
+
+    @Transactional
+    public void deleteMatch(UUID matchId, UUID requesterUserId) {
+        boolean isDt = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.DT);
+        boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
+        if (!isDt && !isAdmin) {
+            throw new DomainException("Solo DT o ADMIN pueden eliminar partidos");
+        }
+        if (!matchRepository.existsById(matchId)) {
+            throw new DomainException("Partido no encontrado");
+        }
+        matchTeamPlayerRepository.deleteByMatchId(matchId);
+        matchTeamPlayerRepository.flush();
+        matchTeamRepository.deleteByMatchId(matchId);
+        matchTeamRepository.flush();
+        matchPairRepository.deleteByMatchId(matchId);
+        matchPairRepository.flush();
+        matchAttendanceRepository.deleteByMatchId(matchId);
+        matchAttendanceRepository.flush();
+        matchTargetGroupRepository.deleteByMatchId(matchId);
+        matchTargetGroupRepository.flush();
+        guestPlayerPositionRepository.deleteByGuestPlayerMatchId(matchId);
+        guestPlayerPositionRepository.flush();
+        guestPlayerRepository.deleteByMatchId(matchId);
+        guestPlayerRepository.flush();
+        matchRepository.deleteById(matchId);
     }
 
     @Transactional(readOnly = true)

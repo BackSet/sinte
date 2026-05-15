@@ -284,6 +284,19 @@ export function MatchesPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      await apiClient.delete(`/api/v1/matches/${matchId}/delete`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Convocatoria eliminada')
+      queryClient.invalidateQueries({ queryKey: ['matches'] })
+      setDetailModalOpen(false)
+      setSelectedMatch(null)
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar la convocatoria')),
+  })
+
   const exportConfirmedMutation = useMutation({
     mutationFn: async (matchId: string) => {
       const response = await apiClient.get(`/api/v1/matches/${matchId}/confirmed/export`, { responseType: 'blob' })
@@ -455,6 +468,18 @@ export function MatchesPage() {
     }
   }
 
+  const handleDeleteMatch = async (match: MatchItem) => {
+    const confirmed = await requestConfirm({
+      title: 'Eliminar convocatoria',
+      description: `Seguro que deseas eliminar "${match.title}" permanentemente? Se borraran todos los datos asociados (asistencias, parejas, equipos, invitados). Esta accion no se puede deshacer.`,
+      confirmLabel: 'Eliminar convocatoria',
+      variant: 'danger',
+    })
+    if (confirmed) {
+      deleteMutation.mutate(match.id)
+    }
+  }
+
   const visibleMatches = (matchesQuery.data ?? [])
     .filter((match) => (statusFilter === 'ALL' ? true : match.status === statusFilter))
     .slice()
@@ -563,6 +588,11 @@ export function MatchesPage() {
                         <Icon name="x" size="sm" />
                       </button>
                     )}
+                    {isManager && (
+                      <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDeleteMatch(match)} disabled={deleteMutation.isPending} title="Eliminar convocatoria">
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    )}
                     {canManageTeams && (
                       <button className="ui-icon-btn" onClick={() => exportConfirmedMutation.mutate(match.id)} disabled={exportConfirmedMutation.isPending} title="Exportar confirmados">
                         <Icon name="configs" size="sm" />
@@ -593,6 +623,11 @@ export function MatchesPage() {
                       <Icon name="x" size="sm" />
                     </button>
                   )}
+                  {isManager && (
+                    <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDeleteMatch(match)} disabled={deleteMutation.isPending} title="Eliminar convocatoria">
+                      <Icon name="trash" size="sm" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   <button className="ui-icon-btn" onClick={() => openDetail(match)} title="Ver detalle">
@@ -608,9 +643,9 @@ export function MatchesPage() {
             )}
           />
         )}
-        {(cancelMutation.isError || exportConfirmedMutation.isError) && (
+        {(cancelMutation.isError || exportConfirmedMutation.isError || deleteMutation.isError) && (
           <p className="mt-3 text-sm text-[var(--danger)]">
-            {getApiErrorMessage(cancelMutation.error ?? exportConfirmedMutation.error, 'No se pudo completar la accion.')}
+            {getApiErrorMessage(cancelMutation.error ?? exportConfirmedMutation.error ?? deleteMutation.error, 'No se pudo completar la accion.')}
           </p>
         )}
       </ResponsiveSection>
