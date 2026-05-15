@@ -458,6 +458,14 @@ public class MatchService {
         if (!matchRepository.existsById(matchId)) {
             throw new DomainException("Partido no encontrado");
         }
+        List<UUID> guestIds = guestPlayerRepository.findByMatchIdOrderByRespondedAtAsc(matchId)
+                .stream().map(GuestPlayer::getId).toList();
+        if (!guestIds.isEmpty()) {
+            for (UUID guestId : guestIds) {
+                guestPlayerPositionRepository.deleteByGuestPlayerId(guestId);
+            }
+            guestPlayerPositionRepository.flush();
+        }
         matchTeamPlayerRepository.deleteByMatchId(matchId);
         matchTeamPlayerRepository.flush();
         matchTeamRepository.deleteByMatchId(matchId);
@@ -468,10 +476,10 @@ public class MatchService {
         matchAttendanceRepository.flush();
         matchTargetGroupRepository.deleteByMatchId(matchId);
         matchTargetGroupRepository.flush();
-        guestPlayerPositionRepository.deleteByGuestPlayerMatchId(matchId);
-        guestPlayerPositionRepository.flush();
-        guestPlayerRepository.deleteByMatchId(matchId);
-        guestPlayerRepository.flush();
+        if (!guestIds.isEmpty()) {
+            guestPlayerRepository.deleteByMatchId(matchId);
+            guestPlayerRepository.flush();
+        }
         matchRepository.deleteById(matchId);
     }
 
