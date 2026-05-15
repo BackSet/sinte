@@ -336,14 +336,36 @@ public class MatchPairingService {
         MatchPair pair = new MatchPair(match, playerA, playerB, guestA, guestB, positionCode);
         matchPairRepository.save(pair);
 
+        List<UUID> userIds = new ArrayList<>();
+        List<UUID> guestIds = new ArrayList<>();
+        if (playerA != null) userIds.add(playerA.getId());
+        if (playerB != null) userIds.add(playerB.getId());
+        if (guestA != null) guestIds.add(guestA.getId());
+        if (guestB != null) guestIds.add(guestB.getId());
+
+        Map<UUID, String> userPrimary = new HashMap<>();
+        Map<UUID, String> guestPrimary = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            List<UserPosition> upList = userPositionRepository.findByUserIdInOrderByPriority(userIds);
+            for (UserPosition up : upList) {
+                userPrimary.putIfAbsent(up.getUser().getId(), up.getPositionCode());
+            }
+        }
+        if (!guestIds.isEmpty()) {
+            List<GuestPlayerPosition> gpList = guestPlayerPositionRepository.findByGuestPlayerIdInOrderByPriority(guestIds);
+            for (GuestPlayerPosition gp : gpList) {
+                guestPrimary.putIfAbsent(gp.getGuestPlayer().getId(), gp.getPositionCode());
+            }
+        }
+
         List<MatchPair> savedPairs = matchPairRepository.findByMatchIdOrderByCreatedAtAsc(matchId);
         List<PairView> pairViews = new ArrayList<>();
         List<PairingPlayer> unpaired = new ArrayList<>();
         int total = 0;
 
         for (MatchPair p : savedPairs) {
-            PairingPlayer pa = toPairingPlayer(p.getPlayerA(), p.getGuestPlayerA());
-            PairingPlayer pb = toPairingPlayer(p.getPlayerB(), p.getGuestPlayerB());
+            PairingPlayer pa = toPairingPlayer(p.getPlayerA(), p.getGuestPlayerA(), p.getPositionCode(), userPrimary, guestPrimary);
+            PairingPlayer pb = toPairingPlayer(p.getPlayerB(), p.getGuestPlayerB(), p.getPositionCode(), userPrimary, guestPrimary);
             pairViews.add(new PairView(p.getId(), p.getPositionCode(), pa, pb));
             total += (pa.userId() != null || pa.guestPlayerId() != null ? 1 : 0) + (pb.userId() != null || pb.guestPlayerId() != null ? 1 : 0);
         }
