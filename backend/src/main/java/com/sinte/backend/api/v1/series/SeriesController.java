@@ -87,6 +87,13 @@ public class SeriesController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{seriesId}/delete")
+    @PreAuthorize("hasAnyRole('DT','ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable UUID seriesId) {
+        matchService.deleteSeries(seriesId, SecurityUtils.currentUserId());
+        return ResponseEntity.noContent().build();
+    }
+
     private SeriesRuleRequest toServiceRule(SeriesRuleApiRequest request) {
         RecurrenceType recurrenceType = request.recurrenceType();
         return new SeriesRuleRequest(

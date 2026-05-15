@@ -507,6 +507,25 @@ public class MatchService {
         }
     }
 
+    @Transactional
+    public void deleteSeries(UUID seriesId, UUID requesterUserId) {
+        boolean isDt = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.DT);
+        boolean isAdmin = userRoleRepository.existsByUserIdAndRoleCode(requesterUserId, RoleCode.ADMIN);
+        if (!isDt && !isAdmin) {
+            throw new DomainException("Solo DT o ADMIN pueden eliminar series");
+        }
+        if (!matchSeriesRepository.existsById(seriesId)) {
+            throw new DomainException("Serie no encontrada");
+        }
+        matchRepository.unlinkMatchesBySeriesId(seriesId);
+        matchRepository.flush();
+        matchSeriesTargetGroupRepository.deleteBySeriesId(seriesId);
+        matchSeriesTargetGroupRepository.flush();
+        matchSeriesRuleRepository.deleteBySeriesId(seriesId);
+        matchSeriesRuleRepository.flush();
+        matchSeriesRepository.deleteById(seriesId);
+    }
+
     private MatchSeriesRule toSeriesRule(MatchSeries series, SeriesRuleRequest ruleRequest) {
         return new MatchSeriesRule(
                 series,

@@ -9,6 +9,7 @@ import { DateTimeField } from '../../components/ui/DateTimeField'
 import { GroupSelector } from '../../components/ui/GroupSelector'
 import { Icon } from '../../components/ui/Icon'
 import { useToastStore } from '../../store/toast-store'
+import { useConfirmDialog } from '../../components/ui/ConfirmDialog'
 
 type RecurrenceType = 'WEEKLY' | 'EVERY_N_DAYS' | 'MONTHLY_DAY_OF_MONTH'
 
@@ -136,6 +137,7 @@ function emptyForm() {
 export function SeriesPage() {
   const queryClient = useQueryClient()
   const addToast = useToastStore((s) => s.addToast)
+  const { ConfirmDialogComponent, requestConfirm } = useConfirmDialog()
 
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [editingSeries, setEditingSeries] = useState<SeriesItem | null>(null)
@@ -213,6 +215,31 @@ export function SeriesPage() {
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo desactivar la serie')),
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (seriesId: string) => {
+      await apiClient.delete(`/api/v1/series/${seriesId}/delete`)
+    },
+    onSuccess: () => {
+      addToast('success', 'Serie eliminada')
+      queryClient.invalidateQueries({ queryKey: ['series'] })
+      setFormModalOpen(false)
+      setEditingSeries(null)
+    },
+    onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar la serie')),
+  })
+
+  const handleDeleteSeries = async (series: SeriesItem) => {
+    const confirmed = await requestConfirm({
+      title: 'Eliminar serie',
+      description: `Seguro que deseas eliminar "${series.defaultTitle}"? Los partidos ya generados quedaran sin serie. Esta accion no se puede deshacer.`,
+      confirmLabel: 'Eliminar serie',
+      variant: 'danger',
+    })
+    if (confirmed) {
+      deleteMutation.mutate(series.id)
+    }
+  }
 
   const openCreate = () => {
     setEditingSeries(null)
@@ -313,6 +340,8 @@ export function SeriesPage() {
 
   return (
     <div className="space-y-6">
+      {ConfirmDialogComponent}
+
       <ResponsiveSection
         title="Series recurrentes"
         description="Configura reglas semanales, cada N dias o mensual por dia del mes"
@@ -361,6 +390,9 @@ export function SeriesPage() {
                     <button className="ui-icon-btn" onClick={() => openEdit(series)} title="Editar">
                       <Icon name="eye" size="sm" />
                     </button>
+                    <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDeleteSeries(series)} disabled={deleteMutation.isPending} title="Eliminar serie">
+                      <Icon name="trash" size="sm" />
+                    </button>
                     {series.active ? (
                       <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => deactivateMutation.mutate(series.id)} disabled={deactivateMutation.isPending} title="Desactivar">
                         <Icon name="x" size="sm" />
@@ -392,6 +424,9 @@ export function SeriesPage() {
                 <div className="flex flex-wrap gap-1 pt-1">
                   <button className="ui-icon-btn" onClick={() => openEdit(series)} title="Editar">
                     <Icon name="eye" size="sm" />
+                  </button>
+                  <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => handleDeleteSeries(series)} title="Eliminar serie">
+                    <Icon name="trash" size="sm" />
                   </button>
                   {series.active ? (
                     <button className="ui-icon-btn ui-icon-btn-danger" onClick={() => deactivateMutation.mutate(series.id)} title="Desactivar">

@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,6 +21,10 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     boolean existsBySeriesIdAndStartsAt(UUID seriesId, OffsetDateTime startsAt);
 
     List<Match> findBySeriesIdAndStatus(UUID seriesId, MatchStatus status);
+
+    @Modifying
+    @Query("UPDATE Match m SET m.series = NULL, m.sourceType = com.sinte.backend.domain.enums.MatchSourceType.MANUAL WHERE m.series.id = :seriesId")
+    void unlinkMatchesBySeriesId(@Param("seriesId") UUID seriesId);
 
     @Query("""
            SELECT DISTINCT m
