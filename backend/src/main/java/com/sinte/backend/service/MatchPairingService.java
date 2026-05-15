@@ -565,18 +565,6 @@ public class MatchPairingService {
         return p.secondaryPositionCode();
     }
 
-    private PairingPlayer toPairingPlayer(User user, GuestPlayer guest) {
-        if (user != null) {
-            return new PairingPlayer(user.getId(), null, user.getFullName(), user.getPlayerHandle(), "UNKNOWN", null, true);
-        }
-        if (guest != null) {
-            String handle = guest.getNickname();
-            if (guest.getShirtNumber() != null) handle += "#" + guest.getShirtNumber();
-            return new PairingPlayer(null, guest.getId(), guest.getFullName(), handle, "UNKNOWN", null, true);
-        }
-        return new PairingPlayer(null, null, null, null, "UNKNOWN", null, true);
-    }
-
     private PairingPlayer toPairingPlayer(User user, GuestPlayer guest, String positionCode, Map<UUID, String> userPrimary, Map<UUID, String> guestPrimary) {
         if (user != null) {
             return new PairingPlayer(user.getId(), null, user.getFullName(), user.getPlayerHandle(), positionCode, null, true);
