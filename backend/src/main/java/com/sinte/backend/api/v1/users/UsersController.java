@@ -63,7 +63,8 @@ public class UsersController {
     ) {
         List<UserResponse> users;
         if (role != null && !role.isBlank()) {
-            users = userRepository.findByRole(role)
+            RoleCode roleCode = RoleCode.valueOf(role.toUpperCase());
+            users = userRepository.findByRole(roleCode)
                     .stream()
                     .map(this::toResponse)
                     .toList();

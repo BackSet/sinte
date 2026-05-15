@@ -1,6 +1,7 @@
 package com.sinte.backend.repository;
 
 import com.sinte.backend.domain.User;
+import com.sinte.backend.domain.enums.RoleCode;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,14 +24,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByNicknameAndNicknameTag(@Param("nickname") String nickname, @Param("nicknameTag") String nicknameTag);
 
     @Query("""
-           SELECT u
+           SELECT DISTINCT u
            FROM User u
            JOIN UserRole ur ON ur.user.id = u.id
            JOIN Role r ON r.id = ur.role.id
            WHERE r.code = :roleCode
            ORDER BY u.createdAt DESC
            """)
-    List<User> findByRole(@Param("roleCode") String roleCode);
+    List<User> findByRole(@Param("roleCode") RoleCode roleCode);
 
     boolean existsByNicknameAndNicknameTag(
             @Param("nickname") String nickname,
