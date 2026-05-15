@@ -68,7 +68,7 @@ export function PairBadge({ playerA, playerB, positionCode, pairNumber, onDelete
           {onDelete && (
             <button
               onClick={onDelete}
-              className="text-[var(--danger)] hover:text-[var(--danger)]/80"
+              className="ui-icon-btn ui-icon-btn-danger"
               title="Eliminar pareja"
             >
               <Icon name="trash" size="sm" />

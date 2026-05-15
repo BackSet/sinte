@@ -164,7 +164,8 @@ export function ConfigsPage() {
         description="Configuraciones reutilizables para partidos y series"
         action={
           <button className="ui-button" onClick={openCreate}>
-            Nueva configuracion
+            <Icon name="plus" size="sm" />
+            <span>Nueva configuracion</span>
           </button>
         }
       >

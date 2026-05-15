@@ -553,7 +553,7 @@ export function SeriesPage() {
             ))}
           </div>
           <button className="ui-button-muted mt-3" type="button" onClick={addRule} title="Agregar regla">
-            <Icon name="user-plus" size="sm" />
+            <Icon name="plus" size="sm" />
             <span>Agregar regla</span>
           </button>
         </div>

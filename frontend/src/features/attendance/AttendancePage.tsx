@@ -3,6 +3,7 @@ import { apiClient } from '../../lib/api-client'
 import { useToastStore } from '../../store/toast-store'
 import { ResponsiveSection } from '../../components/ui/ResponsiveSection'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
+import { Icon } from '../../components/ui/Icon'
 
 type AttendanceItem = {
   id: string
@@ -108,7 +109,8 @@ export function AttendancePage() {
                       disabled={!attendance.attendanceOpen || respondMutation.isPending}
                       onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
                     >
-                      Confirmar
+                      <Icon name="check" size="sm" />
+                      <span>Confirmar</span>
                     </button>
                   )}
                   {attendance.status !== 'NO' && attendance.status !== 'CANCELLED' && (
@@ -117,7 +119,8 @@ export function AttendancePage() {
                       disabled={!attendance.attendanceOpen || respondMutation.isPending}
                       onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
                     >
-                      No podre
+                      <Icon name="x" size="sm" />
+                      <span>No podre</span>
                     </button>
                   )}
                   {attendance.status === 'YES' && (
@@ -126,7 +129,8 @@ export function AttendancePage() {
                       disabled={!attendance.attendanceOpen || respondMutation.isPending}
                       onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'CANCELLED' })}
                     >
-                      Cancelar asistencia
+                      <Icon name="x" size="sm" />
+                      <span>Cancelar asistencia</span>
                     </button>
                   )}
                 </div>
@@ -153,7 +157,8 @@ export function AttendancePage() {
                     disabled={!attendance.attendanceOpen || respondMutation.isPending}
                     onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'YES' })}
                   >
-                    Confirmar
+                    <Icon name="check" size="sm" />
+                    <span>Confirmar</span>
                   </button>
                 )}
                 {attendance.status !== 'NO' && attendance.status !== 'CANCELLED' && (
@@ -162,7 +167,8 @@ export function AttendancePage() {
                     disabled={!attendance.attendanceOpen || respondMutation.isPending}
                     onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'NO' })}
                   >
-                    No podre
+                    <Icon name="x" size="sm" />
+                    <span>No podre</span>
                   </button>
                 )}
                 {attendance.status === 'YES' && (
@@ -171,7 +177,8 @@ export function AttendancePage() {
                     disabled={!attendance.attendanceOpen || respondMutation.isPending}
                     onClick={() => respondMutation.mutate({ matchId: attendance.matchId, status: 'CANCELLED' })}
                   >
-                    Cancelar asistencia
+                    <Icon name="x" size="sm" />
+                    <span>Cancelar asistencia</span>
                   </button>
                 )}
               </div>

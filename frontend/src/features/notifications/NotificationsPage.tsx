@@ -50,7 +50,8 @@ export function NotificationsPage() {
       action={
         unreadCount > 0 ? (
           <button className="ui-button-muted" onClick={() => markAllMutation.mutate()} disabled={markAllMutation.isPending}>
-            {markAllMutation.isPending ? 'Marcando...' : 'Marcar todas como leidas'}
+            <Icon name="check" size="sm" />
+            <span>{markAllMutation.isPending ? 'Marcando...' : 'Marcar todas como leidas'}</span>
           </button>
         ) : undefined
       }
@@ -86,7 +87,8 @@ export function NotificationsPage() {
               </div>
               {!notification.read && (
                 <button className="ui-button-muted shrink-0" onClick={() => markReadMutation.mutate(notification.id)} disabled={markReadMutation.isPending}>
-                  Marcar leida
+                  <Icon name="check" size="sm" />
+                  <span>Marcar leida</span>
                 </button>
               )}
             </div>

@@ -238,10 +238,11 @@ export function ProfilePage() {
           <div className="flex justify-end">
             <button
               type="submit"
-              className="ui-button-primary"
+              className="ui-button"
               disabled={updateProfileMutation.isPending}
             >
-              {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar perfil'}
+              <Icon name="check" size="sm" />
+              <span>{updateProfileMutation.isPending ? 'Guardando...' : 'Guardar perfil'}</span>
             </button>
           </div>
         </form>
@@ -280,11 +281,12 @@ export function ProfilePage() {
           <div className="flex justify-end">
             <button
               type="button"
-              className="ui-button-primary"
+              className="ui-button"
               onClick={handlePositionsSubmit}
               disabled={updatePositionsMutation.isPending}
             >
-              {updatePositionsMutation.isPending ? 'Guardando...' : 'Guardar posiciones'}
+              <Icon name="check" size="sm" />
+              <span>{updatePositionsMutation.isPending ? 'Guardando...' : 'Guardar posiciones'}</span>
             </button>
           </div>
         </div>

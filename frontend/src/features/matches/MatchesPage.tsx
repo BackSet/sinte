@@ -595,7 +595,7 @@ export function MatchesPage() {
                     )}
                     {canManageTeams && (
                       <button className="ui-icon-btn" onClick={() => exportConfirmedMutation.mutate(match.id)} disabled={exportConfirmedMutation.isPending} title="Exportar confirmados">
-                        <Icon name="configs" size="sm" />
+                        <Icon name="download" size="sm" />
                       </button>
                     )}
                   </div>
@@ -635,7 +635,7 @@ export function MatchesPage() {
                   </button>
                   {canManageTeams && (
                     <button className="ui-icon-btn" onClick={() => exportConfirmedMutation.mutate(match.id)} title="Exportar confirmados">
-                      <Icon name="configs" size="sm" />
+                      <Icon name="download" size="sm" />
                     </button>
                   )}
                 </div>
@@ -841,7 +841,7 @@ export function MatchesPage() {
                     <span>{generatePairsMutation.isPending ? 'Generando...' : 'Generar parejas'}</span>
                   </button>
                   <button
-                    className={`ui-button ${manualPairMode ? 'ui-button-primary' : 'ui-button-muted'}`}
+                    className={manualPairMode ? 'ui-button' : 'ui-button-muted'}
                     onClick={() => {
                       setManualPairMode(!manualPairMode)
                       if (!manualPairMode) {
@@ -856,7 +856,7 @@ export function MatchesPage() {
                     <span>{manualPairMode ? 'Cancelar' : 'Emparejamiento manual'}</span>
                   </button>
                   <button
-                    className="ui-button-primary"
+                    className="ui-button"
                     onClick={() => drawTeamsMutation.mutate()}
                     disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
                     title="Sortear equipos"
@@ -949,7 +949,7 @@ export function MatchesPage() {
                       <div className="sm:col-span-2">
                         <label className="ui-form-label">&nbsp;</label>
                         <button
-                          className="ui-button-primary w-full"
+                          className="ui-button w-full"
                           onClick={() => createManualPairMutation.mutate()}
                           disabled={createManualPairMutation.isPending || !manualPairA || !manualPairB || !manualPairPosition}
                           title="Crear pareja"
@@ -1025,7 +1025,7 @@ export function MatchesPage() {
                   <div className="mb-4 flex items-center justify-between">
                     <h4 className="text-sm font-semibold">Equipos sorteados</h4>
                     <button
-                      className="ui-button-muted text-xs"
+                      className="ui-button-muted"
                       onClick={() => drawTeamsMutation.mutate()}
                       disabled={drawTeamsMutation.isPending || !pairingQuery.data?.pairs.length}
                       title="Volver a sortear"
@@ -1165,7 +1165,7 @@ export function MatchesPage() {
                         )}
                         {guest.status === 'CANCELLED' && (
                           <button className="ui-icon-btn" onClick={() => updateGuestStatusMutation.mutate({ guestId: guest.id, status: 'YES' })} disabled={updateGuestStatusMutation.isPending} title="Reactivar">
-                            <Icon name="eye" size="sm" />
+                            <Icon name="check" size="sm" />
                           </button>
                         )}
                         {guest.status === 'NO' && (

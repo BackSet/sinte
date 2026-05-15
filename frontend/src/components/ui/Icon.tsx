@@ -23,6 +23,8 @@ export type IconName =
   | 'eye-off'
   | 'configs'
   | 'trash'
+  | 'download'
+  | 'plus'
 
 type IconSize = 'sm' | 'md' | 'lg'
 
@@ -104,6 +106,12 @@ function IconPath({ name, ...props }: { name: IconName } & SVGProps<SVGPathEleme
   }
   if (name === 'trash') {
     return <path {...props} d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6m4-6v6" />
+  }
+  if (name === 'download') {
+    return <path {...props} d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+  }
+  if (name === 'plus') {
+    return <path {...props} d="M12 5v14M5 12h14" />
   }
   return <path {...props} d="M5 12h14M12 5v14M4 4h16v16H4z" />
 }
