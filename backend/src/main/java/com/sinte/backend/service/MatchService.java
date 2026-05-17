@@ -37,7 +37,6 @@ import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.repository.GuestPlayerRepository;
 import com.sinte.backend.repository.GuestPlayerPositionRepository;
-import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.service.dto.CreateMatchRequest;
 import com.sinte.backend.service.dto.CreateMatchSeriesRequest;
 import com.sinte.backend.service.dto.SeriesRuleRequest;
