@@ -9,6 +9,7 @@ import com.sinte.backend.repository.MatchAttendanceRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.service.dto.AttendanceResponseRequest;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,10 @@ public class AttendanceService {
             throw new DomainException("No se puede responder asistencia de un partido finalizado");
         }
 
+        if (attendance.getMatch().getStartsAt().isBefore(OffsetDateTime.now())) {
+            throw new DomainException("No se puede responder asistencia de un partido que ya paso");
+        }
+
         if (!attendance.getMatch().isAttendanceOpen()) {
             throw new DomainException("La asistencia de este partido esta cerrada");
         }
@@ -65,6 +70,10 @@ public class AttendanceService {
 
         if (attendance.getMatch().getStatus() == MatchStatus.FINISHED) {
             throw new DomainException("No se puede desconfirmar asistencia de un partido finalizado");
+        }
+
+        if (attendance.getMatch().getStartsAt().isBefore(OffsetDateTime.now())) {
+            throw new DomainException("No se puede desconfirmar asistencia de un partido que ya paso");
         }
 
         attendance.resetToPending();

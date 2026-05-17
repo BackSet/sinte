@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1049,6 +1050,7 @@ public class MatchService {
                 .toList();
     }
 
+    @Scheduled(cron = "${app.matches.close-stale.cron:0 */5 * * * *}")
     @Transactional
     public int closeStaleMatches() {
         OffsetDateTime now = OffsetDateTime.now();
@@ -1056,6 +1058,7 @@ public class MatchService {
                 .filter(match -> match.getStatus() == MatchStatus.SCHEDULED && match.getStartsAt().isBefore(now))
                 .toList();
         for (Match match : stale) {
+            match.setAttendanceOpen(false);
             match.updateStatus(MatchStatus.FINISHED);
             matchRepository.save(match);
         }
