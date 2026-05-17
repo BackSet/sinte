@@ -3,7 +3,6 @@ package com.sinte.backend.service;
 import com.sinte.backend.domain.Match;
 import com.sinte.backend.domain.MatchAttendance;
 import com.sinte.backend.domain.MatchConfig;
-import com.sinte.backend.config.SeriesGenerationProperties;
 import com.sinte.backend.domain.GuestPlayer;
 import com.sinte.backend.domain.GuestPlayerPosition;
 import com.sinte.backend.domain.MatchSeries;
@@ -78,7 +77,6 @@ public class MatchService {
     private final AttendanceService attendanceService;
     private final NotificationService notificationService;
     private final GroupService groupService;
-    private final SeriesGenerationProperties seriesGenerationProperties;
 
     public MatchService(
             MatchRepository matchRepository,
@@ -99,8 +97,7 @@ public class MatchService {
             MatchPairRepository matchPairRepository,
             AttendanceService attendanceService,
             NotificationService notificationService,
-            GroupService groupService,
-            SeriesGenerationProperties seriesGenerationProperties
+            GroupService groupService
     ) {
         this.matchRepository = matchRepository;
         this.matchConfigRepository = matchConfigRepository;
@@ -121,7 +118,6 @@ public class MatchService {
         this.attendanceService = attendanceService;
         this.notificationService = notificationService;
         this.groupService = groupService;
-        this.seriesGenerationProperties = seriesGenerationProperties;
     }
 
     @Transactional
@@ -194,8 +190,7 @@ public class MatchService {
                 .toList();
         matchSeriesRuleRepository.saveAll(rules);
         saveSeriesTargetGroups(savedSeries, targetGroups);
-        LocalDate generationTo = today.plusDays(Math.max(1, seriesGenerationProperties.getHorizonDays()));
-        generateMatchesForSeries(savedSeries, today, generationTo);
+        generateNextMatchIfDue(savedSeries);
         return savedSeries;
     }
 
@@ -250,9 +245,7 @@ public class MatchService {
 
         if (savedSeries.isActive()) {
             cancelFutureSeriesMatches(savedSeries.getId());
-            LocalDate today = LocalDate.now(ZoneId.of(savedSeries.getTimezone()));
-            LocalDate generationTo = today.plusDays(Math.max(1, seriesGenerationProperties.getHorizonDays()));
-            generateMatchesForSeries(savedSeries, today, generationTo);
+            generateNextMatchIfDue(savedSeries);
         }
 
         return savedSeries;
@@ -274,7 +267,9 @@ public class MatchService {
         int generatedCount = 0;
         List<MatchSeries> activeSeries = matchSeriesRepository.findByActiveTrue();
         for (MatchSeries series : activeSeries) {
-            generatedCount += generateMatchesForSeries(series, from, to).size();
+            if (generateNextMatchIfDue(series) != null) {
+                generatedCount++;
+            }
         }
         return generatedCount;
     }
@@ -300,7 +295,7 @@ public class MatchService {
                 if (!matchesRuleDate(series, rule, date)) {
                     continue;
                 }
-                ZonedDateTime startZdt = ZonedDateTime.of(date, rule.getStartTime(), zoneId);
+                ZonedDateTime startZdt = ZonedDateTime.of(date, rule.getMatchStartTime(), zoneId);
                 OffsetDateTime startsAt = startZdt.toOffsetDateTime();
                 OffsetDateTime endsAt = startsAt.plusHours(2);
 
@@ -308,25 +303,70 @@ public class MatchService {
                     continue;
                 }
 
-                Match match = new Match(
-                        series.getCreatedBy(),
-                        resolveSeriesGeneratedTitle(series, date),
-                        "Generado automaticamente por serie",
-                        series.getConfig().getLocation(),
-                        startsAt,
-                        endsAt,
-                        MatchSourceType.SERIES,
-                        series,
-                        series.getConfig()
-                );
-                match.snapshotFromConfig();
-                Match saved = matchRepository.save(match);
-                createMatchTargetGroupsFromIds(saved, targetGroupIds);
-                createAttendanceAndNotifyPlayers(saved, targetGroupIds);
-                generated.add(saved);
+                Match match = createSeriesMatch(series, date, startsAt, endsAt, targetGroupIds);
+                generated.add(match);
             }
         }
         return generated;
+    }
+
+    @Transactional
+    public Match generateNextMatchIfDue(MatchSeries series) {
+        ZoneId zoneId = ZoneId.of(series.getTimezone());
+        List<MatchSeriesRule> rules = matchSeriesRuleRepository.findBySeriesId(series.getId());
+        List<UUID> targetGroupIds = matchSeriesTargetGroupRepository.findGroupIdsBySeriesId(series.getId());
+        if (rules.isEmpty()) {
+            return null;
+        }
+
+        ZonedDateTime now = ZonedDateTime.now(zoneId);
+        LocalDate today = now.toLocalDate();
+        LocalDate checkDate = maxDate(today, series.getStartDate());
+        if (series.getEndDate() != null && checkDate.isAfter(series.getEndDate())) {
+            return null;
+        }
+
+        for (MatchSeriesRule rule : rules) {
+            if (!matchesRuleDate(series, rule, checkDate)) {
+                continue;
+            }
+            ZonedDateTime trigger = ZonedDateTime.of(checkDate, rule.getTriggerTime(), zoneId);
+            if (now.isBefore(trigger)) {
+                continue;
+            }
+            ZonedDateTime matchStart = ZonedDateTime.of(checkDate, rule.getMatchStartTime(), zoneId);
+            if (matchStart.isBefore(now)) {
+                continue;
+            }
+            OffsetDateTime startsAt = matchStart.toOffsetDateTime();
+            OffsetDateTime endsAt = startsAt.plusHours(2);
+
+            if (matchRepository.existsBySeriesIdAndStartsAt(series.getId(), startsAt)) {
+                continue;
+            }
+
+            return createSeriesMatch(series, checkDate, startsAt, endsAt, targetGroupIds);
+        }
+        return null;
+    }
+
+    private Match createSeriesMatch(MatchSeries series, LocalDate date, OffsetDateTime startsAt, OffsetDateTime endsAt, List<UUID> targetGroupIds) {
+        Match match = new Match(
+                series.getCreatedBy(),
+                resolveSeriesGeneratedTitle(series, date),
+                "Generado automaticamente por serie",
+                series.getConfig().getLocation(),
+                startsAt,
+                endsAt,
+                MatchSourceType.SERIES,
+                series,
+                series.getConfig()
+        );
+        match.snapshotFromConfig();
+        Match saved = matchRepository.save(match);
+        createMatchTargetGroupsFromIds(saved, targetGroupIds);
+        createAttendanceAndNotifyPlayers(saved, targetGroupIds);
+        return saved;
     }
 
     private boolean matchesRuleDate(MatchSeries series, MatchSeriesRule rule, LocalDate date) {
@@ -533,7 +573,8 @@ public class MatchService {
                 ruleRequest.dayOfWeek() != null ? (short) ruleRequest.dayOfWeek().getValue() : null,
                 ruleRequest.intervalDays(),
                 ruleRequest.dayOfMonth() != null ? ruleRequest.dayOfMonth().shortValue() : null,
-                ruleRequest.startTime()
+                ruleRequest.triggerTime(),
+                ruleRequest.matchStartTime()
         );
     }
 
@@ -541,8 +582,11 @@ public class MatchService {
         if (rule.recurrenceType() == null) {
             throw new DomainException("El tipo de recurrencia es obligatorio");
         }
-        if (rule.startTime() == null) {
-            throw new DomainException("La regla de serie debe tener hora de inicio valida");
+        if (rule.triggerTime() == null) {
+            throw new DomainException("La regla de serie debe tener hora de creacion valida");
+        }
+        if (rule.matchStartTime() == null) {
+            throw new DomainException("La regla de serie debe tener hora de partido valida");
         }
         if (rule.recurrenceType() == RecurrenceType.WEEKLY) {
             if (rule.dayOfWeek() == null) {

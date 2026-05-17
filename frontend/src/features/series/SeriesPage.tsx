@@ -18,7 +18,8 @@ type SeriesRule = {
   dayOfWeek?: number
   intervalDays?: number
   dayOfMonth?: number
-  startTime: string
+  triggerTime: string
+  matchStartTime: string
 }
 
 type SeriesItem = {
@@ -77,7 +78,8 @@ type RuleFormItem = {
   dayOfWeek?: number
   intervalDays?: number
   dayOfMonth?: number
-  startTime: string
+  triggerTime: string
+  matchStartTime: string
 }
 
 const DEFAULT_TARGET_PLAYERS = 14
@@ -85,7 +87,7 @@ const DEFAULT_DURATION_MINUTES = 90
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota'
 
 function createWeeklyRule(): RuleFormItem {
-  return { id: crypto.randomUUID(), recurrenceType: 'WEEKLY', dayOfWeek: 7, startTime: '09:00' }
+  return { id: crypto.randomUUID(), recurrenceType: 'WEEKLY', dayOfWeek: 7, triggerTime: '00:00', matchStartTime: '20:00' }
 }
 
 function ruleFromSeries(rule: SeriesRule): RuleFormItem {
@@ -95,30 +97,27 @@ function ruleFromSeries(rule: SeriesRule): RuleFormItem {
     dayOfWeek: rule.dayOfWeek,
     intervalDays: rule.intervalDays,
     dayOfMonth: rule.dayOfMonth,
-    startTime: rule.startTime,
+    triggerTime: rule.triggerTime,
+    matchStartTime: rule.matchStartTime,
   }
 }
 
 function describeRule(rule: SeriesRule) {
-  if (rule.recurrenceType === 'WEEKLY') {
-    const label = weekdays.find((day) => day.value === rule.dayOfWeek)?.label ?? `Dia ${rule.dayOfWeek}`
-    return `Semanal: ${label} ${rule.startTime}`
-  }
-  if (rule.recurrenceType === 'EVERY_N_DAYS') {
-    return `Cada ${rule.intervalDays ?? '?'} dias a las ${rule.startTime}`
-  }
-  return `Mensual: dia ${rule.dayOfMonth ?? '?'} a las ${rule.startTime}`
+  const prefix = rule.recurrenceType === 'WEEKLY'
+    ? `Semanal: ${weekdays.find((day) => day.value === rule.dayOfWeek)?.label ?? `Dia ${rule.dayOfWeek}`}`
+    : rule.recurrenceType === 'EVERY_N_DAYS'
+    ? `Cada ${rule.intervalDays ?? '?'} dias`
+    : `Mensual: dia ${rule.dayOfMonth ?? '?'}`
+  return `${prefix} — Crea ${rule.triggerTime} / Juega ${rule.matchStartTime}`
 }
 
 function describeDraftRule(rule: RuleFormItem) {
-  if (rule.recurrenceType === 'WEEKLY') {
-    const label = weekdays.find((day) => day.value === rule.dayOfWeek)?.label ?? `Dia ${rule.dayOfWeek}`
-    return `Cada ${label} a las ${rule.startTime}`
-  }
-  if (rule.recurrenceType === 'EVERY_N_DAYS') {
-    return `Cada ${rule.intervalDays ?? '?'} dias a las ${rule.startTime}`
-  }
-  return `Dia ${rule.dayOfMonth ?? '?'} de cada mes a las ${rule.startTime}`
+  const prefix = rule.recurrenceType === 'WEEKLY'
+    ? `Cada ${weekdays.find((day) => day.value === rule.dayOfWeek)?.label ?? `Dia ${rule.dayOfWeek}`}`
+    : rule.recurrenceType === 'EVERY_N_DAYS'
+    ? `Cada ${rule.intervalDays ?? '?'} dias`
+    : `Dia ${rule.dayOfMonth ?? '?'} de cada mes`
+  return `${prefix} — Crea ${rule.triggerTime} / Juega ${rule.matchStartTime}`
 }
 
 function emptyForm() {
@@ -159,7 +158,8 @@ export function SeriesPage() {
       dayOfWeek: rule.recurrenceType === 'WEEKLY' ? rule.dayOfWeek : null,
       intervalDays: rule.recurrenceType === 'EVERY_N_DAYS' ? rule.intervalDays : null,
       dayOfMonth: rule.recurrenceType === 'MONTHLY_DAY_OF_MONTH' ? rule.dayOfMonth : null,
-      startTime: rule.startTime,
+      triggerTime: rule.triggerTime,
+      matchStartTime: rule.matchStartTime,
     }))
 
   const resetForm = () => {
@@ -274,7 +274,8 @@ export function SeriesPage() {
         dayOfWeek: rule.recurrenceType === 'WEEKLY' ? rule.dayOfWeek : null,
         intervalDays: rule.recurrenceType === 'EVERY_N_DAYS' ? rule.intervalDays : null,
         dayOfMonth: rule.recurrenceType === 'MONTHLY_DAY_OF_MONTH' ? rule.dayOfMonth : null,
-        startTime: rule.startTime,
+        triggerTime: rule.triggerTime,
+        matchStartTime: rule.matchStartTime,
       })),
       active: true,
     })
@@ -535,8 +536,12 @@ export function SeriesPage() {
                   </div>
                 )}
                 <div>
-                  <label className="ui-form-label">Hora</label>
-                  <DateTimeField type="time" value={rule.startTime} onChange={(e) => updateRule(rule.id, { startTime: e.target.value })} required />
+                  <label className="ui-form-label">Crea convocatoria</label>
+                  <DateTimeField type="time" value={rule.triggerTime} onChange={(e) => updateRule(rule.id, { triggerTime: e.target.value })} required />
+                </div>
+                <div>
+                  <label className="ui-form-label">Hora partido</label>
+                  <DateTimeField type="time" value={rule.matchStartTime} onChange={(e) => updateRule(rule.id, { matchStartTime: e.target.value })} required />
                 </div>
                 <div className="ui-muted-surface flex items-center rounded-lg px-3 py-2 md:col-span-1">
                   <div>

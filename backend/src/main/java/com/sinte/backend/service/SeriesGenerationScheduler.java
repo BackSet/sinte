@@ -1,7 +1,7 @@
 package com.sinte.backend.service;
 
-import com.sinte.backend.config.SeriesGenerationProperties;
-import java.time.LocalDate;
+import com.sinte.backend.domain.MatchSeries;
+import com.sinte.backend.repository.MatchSeriesRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -11,17 +11,17 @@ import org.springframework.stereotype.Component;
 public class SeriesGenerationScheduler {
 
     private final MatchService matchService;
-    private final SeriesGenerationProperties properties;
+    private final MatchSeriesRepository matchSeriesRepository;
 
-    public SeriesGenerationScheduler(MatchService matchService, SeriesGenerationProperties properties) {
+    public SeriesGenerationScheduler(MatchService matchService, MatchSeriesRepository matchSeriesRepository) {
         this.matchService = matchService;
-        this.properties = properties;
+        this.matchSeriesRepository = matchSeriesRepository;
     }
 
-    @Scheduled(cron = "${app.series.generation.cron:0 0 3 * * *}")
+    @Scheduled(cron = "${app.series.generation.cron:0 */5 * * * *}")
     public void generateUpcomingMatches() {
-        LocalDate from = LocalDate.now();
-        LocalDate to = from.plusDays(Math.max(1, properties.getHorizonDays()));
-        matchService.generateMatchesForActiveSeries(from, to);
+        for (MatchSeries series : matchSeriesRepository.findByActiveTrue()) {
+            matchService.generateNextMatchIfDue(series);
+        }
     }
 }

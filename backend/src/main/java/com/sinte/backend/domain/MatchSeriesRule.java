@@ -18,7 +18,7 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "match_series_rules",
-        uniqueConstraints = @UniqueConstraint(name = "uk_match_series_rules", columnNames = {"series_id", "day_of_week", "start_time"})
+        uniqueConstraints = @UniqueConstraint(name = "uk_match_series_rules", columnNames = {"series_id", "day_of_week", "trigger_time"})
 )
 public class MatchSeriesRule {
 
@@ -43,8 +43,11 @@ public class MatchSeriesRule {
     @Column(name = "day_of_month")
     private Short dayOfMonth;
 
-    @Column(name = "start_time", nullable = false)
-    private LocalTime startTime;
+    @Column(name = "trigger_time", nullable = false)
+    private LocalTime triggerTime;
+
+    @Column(name = "match_start_time", nullable = false)
+    private LocalTime matchStartTime;
 
     protected MatchSeriesRule() {
     }
@@ -55,14 +58,16 @@ public class MatchSeriesRule {
             Short dayOfWeek,
             Integer intervalDays,
             Short dayOfMonth,
-            LocalTime startTime
+            LocalTime triggerTime,
+            LocalTime matchStartTime
     ) {
         this.series = series;
         this.recurrenceType = recurrenceType;
         this.dayOfWeek = dayOfWeek;
         this.intervalDays = intervalDays;
         this.dayOfMonth = dayOfMonth;
-        this.startTime = startTime;
+        this.triggerTime = triggerTime;
+        this.matchStartTime = matchStartTime;
     }
 
     public MatchSeries getSeries() {
@@ -85,8 +90,12 @@ public class MatchSeriesRule {
         return dayOfMonth;
     }
 
-    public LocalTime getStartTime() {
-        return startTime;
+    public LocalTime getTriggerTime() {
+        return triggerTime;
+    }
+
+    public LocalTime getMatchStartTime() {
+        return matchStartTime;
     }
 
 }

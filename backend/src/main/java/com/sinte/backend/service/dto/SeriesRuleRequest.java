@@ -9,6 +9,7 @@ public record SeriesRuleRequest(
         DayOfWeek dayOfWeek,
         Integer intervalDays,
         Integer dayOfMonth,
-        LocalTime startTime
+        LocalTime triggerTime,
+        LocalTime matchStartTime
 ) {
 }

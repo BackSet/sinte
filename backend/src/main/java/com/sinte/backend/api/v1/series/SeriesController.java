@@ -101,7 +101,8 @@ public class SeriesController {
                 request.dayOfWeek() != null ? java.time.DayOfWeek.of(request.dayOfWeek()) : null,
                 request.intervalDays(),
                 request.dayOfMonth() != null ? Integer.valueOf(request.dayOfMonth()) : null,
-                request.startTime()
+                request.triggerTime(),
+                request.matchStartTime()
         );
     }
 
@@ -134,7 +135,8 @@ public class SeriesController {
                 rule.getDayOfWeek(),
                 rule.getIntervalDays(),
                 rule.getDayOfMonth(),
-                rule.getStartTime()
+                rule.getTriggerTime(),
+                rule.getMatchStartTime()
         );
     }
 
@@ -162,7 +164,8 @@ public class SeriesController {
             @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(7) Short dayOfWeek,
             @jakarta.validation.constraints.Min(1) Integer intervalDays,
             @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(31) Short dayOfMonth,
-            @NotNull LocalTime startTime
+            @NotNull LocalTime triggerTime,
+            @NotNull LocalTime matchStartTime
     ) {
     }
 
@@ -171,7 +174,8 @@ public class SeriesController {
             Short dayOfWeek,
             Integer intervalDays,
             Short dayOfMonth,
-            LocalTime startTime
+            LocalTime triggerTime,
+            LocalTime matchStartTime
     ) {
     }
 
