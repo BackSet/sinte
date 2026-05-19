@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sinte.backend.api.v1.auth.dto.AuthResponse;
 import com.sinte.backend.api.v1.auth.dto.RegisterRequest;
+import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.Match;
-import com.sinte.backend.domain.MatchAttendance;
 import com.sinte.backend.domain.MatchConfig;
 import com.sinte.backend.domain.SinteGroup;
 import com.sinte.backend.domain.SinteGroupMember;
-import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.repository.AttendanceRepository;
 import com.sinte.backend.repository.NotificationRepository;
 import com.sinte.backend.service.AuthService;
 import com.sinte.backend.service.GroupService;
@@ -40,7 +40,7 @@ class GroupMatchTargetingIntegrationTest {
     private MatchConfigService matchConfigService;
 
     @Autowired
-    private MatchAttendanceRepository matchAttendanceRepository;
+    private AttendanceRepository attendanceRepository;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -93,7 +93,7 @@ class GroupMatchTargetingIntegrationTest {
                 List.of(group.getId())
         ));
 
-        List<MatchAttendance> attendance = matchAttendanceRepository.findByMatchIdOrderByStatusAsc(match.getId());
+        List<Attendance> attendance = attendanceRepository.findByMatchIdOrderByStatusAsc(match.getId());
         assertThat(attendance).hasSize(1);
         assertThat(attendance.getFirst().getUser().getId()).isEqualTo(playerInGroup.userId());
 

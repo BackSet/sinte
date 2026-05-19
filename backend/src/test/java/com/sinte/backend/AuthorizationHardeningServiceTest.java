@@ -6,14 +6,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.sinte.backend.domain.GuestPlayer;
+import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.Match;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.enums.MatchSourceType;
 import com.sinte.backend.domain.enums.RoleCode;
-import com.sinte.backend.repository.GuestPlayerPositionRepository;
-import com.sinte.backend.repository.GuestPlayerRepository;
-import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.repository.AttendanceRepository;
 import com.sinte.backend.repository.MatchPairRepository;
 import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.MatchTeamPlayerRepository;
@@ -23,7 +21,6 @@ import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserRoleRepository;
 import com.sinte.backend.service.AttendanceService;
 import com.sinte.backend.service.DomainException;
-import com.sinte.backend.service.GuestPlayerService;
 import com.sinte.backend.service.MatchPairingService;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -40,13 +37,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 class AuthorizationHardeningServiceTest {
 
     @Mock
-    private GuestPlayerRepository guestPlayerRepository;
-    @Mock
-    private GuestPlayerPositionRepository guestPlayerPositionRepository;
+    private AttendanceRepository attendanceRepository;
     @Mock
     private MatchRepository matchRepository;
-    @Mock
-    private MatchAttendanceRepository matchAttendanceRepository;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -61,26 +54,14 @@ class AuthorizationHardeningServiceTest {
     @Mock
     private MatchTeamPlayerRepository matchTeamPlayerRepository;
 
-    private GuestPlayerService guestPlayerService;
     private MatchPairingService matchPairingService;
     private AttendanceService attendanceService;
 
     @BeforeEach
     void setUp() {
-        guestPlayerService = new GuestPlayerService(
-                guestPlayerRepository,
-                guestPlayerPositionRepository,
-                matchRepository,
-                matchAttendanceRepository,
-                userRepository,
-                userRoleRepository
-        );
-
         matchPairingService = new MatchPairingService(
-                matchAttendanceRepository,
-                guestPlayerRepository,
+                attendanceRepository,
                 userPositionRepository,
-                guestPlayerPositionRepository,
                 matchPairRepository,
                 matchTeamRepository,
                 matchTeamPlayerRepository,
@@ -89,56 +70,7 @@ class AuthorizationHardeningServiceTest {
                 userRoleRepository
         );
 
-        attendanceService = new AttendanceService(matchAttendanceRepository, userRoleRepository);
-    }
-
-    @Test
-    void guestCreationAllowsCalledPlayerAndBlocksOutsider() {
-        UUID matchId = UUID.randomUUID();
-        UUID calledPlayerId = UUID.randomUUID();
-        UUID outsiderId = UUID.randomUUID();
-
-        Match match = buildMatch(matchId, UUID.randomUUID());
-        User calledPlayer = buildUser(calledPlayerId);
-        User outsider = buildUser(outsiderId);
-
-        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
-        when(userRepository.findById(calledPlayerId)).thenReturn(Optional.of(calledPlayer));
-        when(userRepository.findById(outsiderId)).thenReturn(Optional.of(outsider));
-        when(userRoleRepository.existsByUserIdAndRoleCode(calledPlayerId, RoleCode.DT)).thenReturn(false);
-        when(userRoleRepository.existsByUserIdAndRoleCode(calledPlayerId, RoleCode.ADMIN)).thenReturn(false);
-        when(matchAttendanceRepository.existsByMatchIdAndUserId(matchId, calledPlayerId)).thenReturn(true);
-        when(guestPlayerRepository.save(any(GuestPlayer.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        guestPlayerService.createGuestPlayer(matchId, calledPlayerId, "Invitado", "inv", 10, List.of("CENTER_BACK"));
-
-        when(userRoleRepository.existsByUserIdAndRoleCode(outsiderId, RoleCode.DT)).thenReturn(false);
-        when(userRoleRepository.existsByUserIdAndRoleCode(outsiderId, RoleCode.ADMIN)).thenReturn(false);
-        when(matchAttendanceRepository.existsByMatchIdAndUserId(matchId, outsiderId)).thenReturn(false);
-
-        assertThatThrownBy(() -> guestPlayerService.createGuestPlayer(
-                matchId, outsiderId, "Invitado 2", "inv2", 11, List.of("SETTER")
-        )).isInstanceOf(DomainException.class)
-                .hasMessageContaining("jugador convocado");
-    }
-
-    @Test
-    void guestMutationRejectsCrossMatchGuestIdor() {
-        UUID requestMatchId = UUID.randomUUID();
-        UUID guestMatchId = UUID.randomUUID();
-        UUID guestId = UUID.randomUUID();
-        UUID requesterId = UUID.randomUUID();
-
-        Match guestMatch = buildMatch(guestMatchId, UUID.randomUUID());
-        User creator = buildUser(requesterId);
-        GuestPlayer guest = new GuestPlayer(guestMatch, creator, "Invitado", "inv");
-        ReflectionTestUtils.setField(guest, "id", guestId);
-
-        when(guestPlayerRepository.findById(guestId)).thenReturn(Optional.of(guest));
-
-        assertThatThrownBy(() -> guestPlayerService.confirmGuest(requestMatchId, guestId, requesterId))
-                .isInstanceOf(DomainException.class)
-                .hasMessageContaining("no pertenece al partido");
+        attendanceService = new AttendanceService(attendanceRepository, userRoleRepository);
     }
 
     @Test
@@ -156,11 +88,11 @@ class AuthorizationHardeningServiceTest {
         assertThatThrownBy(() -> matchPairingService.previewPairs(matchId, anotherDtId))
                 .isInstanceOf(DomainException.class)
                 .hasMessageContaining("gestionar este partido");
-        verify(matchAttendanceRepository, never()).findByMatchIdAndStatusOrderByRespondedAtAsc(any(), any());
+        verify(attendanceRepository, never()).findByMatchIdAndStatusOrderByRespondedAtAsc(any(), any());
 
         when(userRoleRepository.existsByUserIdAndRoleCode(outsiderPlayerId, RoleCode.ADMIN)).thenReturn(false);
         when(userRoleRepository.existsByUserIdAndRoleCode(outsiderPlayerId, RoleCode.DT)).thenReturn(false);
-        when(matchAttendanceRepository.existsByMatchIdAndUserId(matchId, outsiderPlayerId)).thenReturn(false);
+        when(attendanceRepository.existsByMatchIdAndUserId(matchId, outsiderPlayerId)).thenReturn(false);
 
         assertThatThrownBy(() -> attendanceService.getAttendanceByMatch(matchId, outsiderPlayerId))
                 .isInstanceOf(DomainException.class)
