@@ -74,7 +74,7 @@ const timezoneOptions = [
 
 type ConfirmedPlayer = {
   userId: string | null
-  guestPlayerId: string | null
+  attendanceId: string | null
   fullName: string
   email: string | null
   playerHandle?: string
@@ -86,7 +86,7 @@ type ConfirmedPlayersResponse = {
 
 type RosterPlayer = {
   userId: string | null
-  guestPlayerId: string | null
+  attendanceId: string | null
   fullName: string
   email: string | null
   playerHandle?: string | null
@@ -102,7 +102,7 @@ type RosterResponse = {
 
 type TeamPlayer = {
   userId: string | null
-  guestPlayerId: string | null
+  attendanceId: string | null
   fullName: string
   playerHandle?: string | null
   primaryPositionCode: string
@@ -114,22 +114,21 @@ type Team = {
   players: TeamPlayer[]
 }
 
-type GuestPlayerItem = {
+type AttendanceItem = {
   id: string
   matchId: string
-  createdByUserId: string
-  fullName: string
-  nickname: string
-  shirtNumber?: number
+  userId?: string | null
+  externalName?: string | null
+  invitedByUserId?: string | null
   status: string
   respondedAt: string | null
   createdAt: string
-  positions: Array<{ positionCode: string; priority: number; isPrimary: boolean }>
+  displayName: string
 }
 
 type PairingPlayer = {
   userId: string | null
-  guestPlayerId: string | null
+  attendanceId: string | null
   fullName: string
   playerHandle?: string | null
   primaryPositionCode: string
@@ -205,9 +204,6 @@ export function MatchesPage() {
   const [detailTab, setDetailTab] = useState<DetailTab>('roster')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SCHEDULED' | 'CANCELLED'>('ALL')
   const [guestFullName, setGuestFullName] = useState('')
-  const [guestNickname, setGuestNickname] = useState('')
-  const [guestShirtNumber, setGuestShirtNumber] = useState<number | undefined>()
-  const [guestPositionCodes, setGuestPositionCodes] = useState<string[]>([])
   const [matchForm, setMatchForm] = useState(emptyMatchForm())
   const [manualPairMode, setManualPairMode] = useState(false)
   const [manualPairA, setManualPairA] = useState<string | null>(null)
@@ -223,7 +219,7 @@ export function MatchesPage() {
 
   const guestsQuery = useQuery({
     queryKey: ['match-guests', selectedMatch?.id],
-    queryFn: async () => (await apiClient.get<GuestPlayerItem[]>(`/api/v1/matches/${selectedMatch!.id}/guest-players`)).data,
+    queryFn: async () => (await apiClient.get<AttendanceItem[]>(`/api/v1/matches/${selectedMatch!.id}/attendances`)).data,
     enabled: Boolean(selectedMatch) && Boolean(canManageGuests),
   })
 
@@ -312,18 +308,12 @@ export function MatchesPage() {
 
   const createGuestMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/guest-players`, {
-        fullName: guestFullName.trim(),
-        nickname: guestNickname.trim() || undefined,
-        shirtNumber: guestShirtNumber,
-        positionCodes: guestPositionCodes.length > 0 ? guestPositionCodes : undefined,
+      await apiClient.post(`/api/v1/matches/${selectedMatch!.id}/attendances`, {
+        externalName: guestFullName.trim(),
       })
     },
     onSuccess: () => {
       setGuestFullName('')
-      setGuestNickname('')
-      setGuestShirtNumber(undefined)
-      setGuestPositionCodes([])
       addToast('success', 'Invitado agregado')
       queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
       queryClient.invalidateQueries({ queryKey: ['match-confirmed', selectedMatch?.id] })
@@ -335,7 +325,7 @@ export function MatchesPage() {
 
   const updateGuestStatusMutation = useMutation({
     mutationFn: async ({ guestId, status }: { guestId: string; status: string }) => {
-      await apiClient.put(`/api/v1/matches/${selectedMatch!.id}/guest-players/${guestId}/attendance`, { status })
+      await apiClient.put(`/api/v1/matches/${selectedMatch!.id}/attendances/${guestId}/status`, { status })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['match-guests', selectedMatch?.id] })
@@ -347,7 +337,7 @@ export function MatchesPage() {
 
   const deleteGuestMutation = useMutation({
     mutationFn: async (guestId: string) => {
-      await apiClient.delete(`/api/v1/matches/${selectedMatch!.id}/guest-players/${guestId}`)
+      await apiClient.delete(`/api/v1/matches/${selectedMatch!.id}/attendances/${guestId}`)
     },
     onSuccess: () => {
       addToast('success', 'Invitado eliminado')
@@ -407,8 +397,8 @@ export function MatchesPage() {
       await apiClient.post<PairingPreviewResponse>(`/api/v1/matches/${selectedMatch!.id}/pairs/manual`, {
         playerAId: isGuestA ? null : manualPairA,
         playerBId: isGuestB ? null : manualPairB,
-        guestPlayerAId: isGuestA ? manualPairA : null,
-        guestPlayerBId: isGuestB ? manualPairB : null,
+        attendanceAId: isGuestA ? manualPairA : null,
+        attendanceBId: isGuestB ? manualPairB : null,
         positionCode: manualPairPosition,
       })
     },
@@ -434,12 +424,6 @@ export function MatchesPage() {
     },
     onError: (error) => addToast('error', getApiErrorMessage(error, 'No se pudo eliminar la pareja')),
   })
-
-  const toggleGuestPosition = (code: string) => {
-    setGuestPositionCodes((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
-    )
-  }
 
   const toggleGroup = (groupId: string) => {
     setMatchForm((prev) => ({
@@ -742,12 +726,12 @@ export function MatchesPage() {
                     {rosterQuery.data.roster.length === 0 && <p className="ui-text-muted text-sm">Aun no hay titulares.</p>}
                       <div className="space-y-1">
                       {rosterQuery.data.roster.map((p, index) => {
-                        const key = p.userId ?? p.guestPlayerId ?? `roster-${index}`
+                        const key = p.userId ?? p.attendanceId ?? `roster-${index}`
                         return (
                           <div key={key} className="flex items-center justify-between rounded-md border bg-[var(--bg-panel)] px-3 py-2">
                             <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
                             <span className="ui-text-muted text-xs">
-                              {positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}
+                              {positionLabel(p.primaryPositionCode)}{p.attendanceId ? ' — Invitado' : ''}
                             </span>
                           </div>
                         )
@@ -760,11 +744,11 @@ export function MatchesPage() {
                       <p className="ui-detail-section-title">Lista de espera ({rosterQuery.data.waitlist.length})</p>
                       <div className="space-y-1">
                         {rosterQuery.data.waitlist.map((p, index) => {
-                          const key = p.userId ?? p.guestPlayerId ?? `waitlist-${index}`
+                          const key = p.userId ?? p.attendanceId ?? `waitlist-${index}`
                           return (
                             <div key={key} className="flex items-center justify-between rounded-md border bg-[var(--bg-panel)] px-3 py-2">
                               <span>{p.fullName}{p.playerHandle ? ` (${p.playerHandle})` : ''}</span>
-                              <span className="ui-text-muted text-xs">{positionLabel(p.primaryPositionCode)}{p.guestPlayerId ? ' — Invitado' : ''}</span>
+                              <span className="ui-text-muted text-xs">{positionLabel(p.primaryPositionCode)}{p.attendanceId ? ' — Invitado' : ''}</span>
                             </div>
                           )
                         })}
@@ -777,8 +761,8 @@ export function MatchesPage() {
                       <p className="ui-detail-section-title">Cancelaron ({rosterQuery.data.cancelled.length})</p>
                       <div className="space-y-1">
                         {rosterQuery.data.cancelled.map((p, index) => {
-                          const key = p.userId ?? p.guestPlayerId ?? `cancelled-${index}`
-                          return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2 ui-text-muted">{p.fullName}{p.guestPlayerId ? ' — Invitado' : ''}</div>
+                          const key = p.userId ?? p.attendanceId ?? `cancelled-${index}`
+                          return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2 ui-text-muted">{p.fullName}{p.attendanceId ? ' — Invitado' : ''}</div>
                         })}
                       </div>
                     </div>
@@ -789,8 +773,8 @@ export function MatchesPage() {
                   <p className="ui-detail-section-title">Confirmados ({confirmedQuery.data.length} / {selectedMatch.targetPlayers ?? '-'})</p>
                   <div className="space-y-1">
                     {confirmedQuery.data.map((player, index) => {
-                      const key = player.userId ?? player.guestPlayerId ?? `confirmed-${index}`
-                      return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.guestPlayerId ? ' — Invitado' : ''}</div>
+                      const key = player.userId ?? player.attendanceId ?? `confirmed-${index}`
+                      return <div key={key} className="rounded-md border bg-[var(--bg-panel)] px-3 py-2">{player.fullName}{player.playerHandle ? ` (${player.playerHandle})` : ''}{player.attendanceId ? ' — Invitado' : ''}</div>
                     })}
                   </div>
                 </div>
@@ -904,7 +888,7 @@ export function MatchesPage() {
                                 .filter((g) => g.status === 'YES')
                                 .map((g) => (
                                   <option key={g.id} value={g.id}>
-                                    {g.fullName}
+                                    {g.displayName}
                                   </option>
                                 ))}
                         </select>
@@ -932,7 +916,7 @@ export function MatchesPage() {
                                 .filter((g) => g.status === 'YES')
                                 .map((g) => (
                                   <option key={g.id} value={g.id}>
-                                    {g.fullName}
+                                    {g.displayName}
                                   </option>
                                 ))}
                         </select>
@@ -1001,7 +985,7 @@ export function MatchesPage() {
                       <p className="mb-2 text-sm font-medium">Jugadores sin pareja ({pairingQuery.data.unpaired.length})</p>
                       <div className="flex flex-wrap gap-2">
                         {pairingQuery.data.unpaired.map((p, index) => {
-                          const key = p.userId ?? p.guestPlayerId ?? `unpaired-${index}`
+                          const key = p.userId ?? p.attendanceId ?? `unpaired-${index}`
                           return (
                             <span key={key} className="inline-flex items-center gap-1 rounded-md border border-[var(--warning)] px-2 py-1 text-xs">
                               <span className="h-1.5 w-1.5 rounded-full bg-[var(--warning)]"></span>
@@ -1054,10 +1038,10 @@ export function MatchesPage() {
                         </div>
                         <div className="space-y-2">
                           {team.players.map((player, i) => {
-                            const key = player.userId ?? player.guestPlayerId ?? `team-${team.teamNumber}-${i}`
+                            const key = player.userId ?? player.attendanceId ?? `team-${team.teamNumber}-${i}`
                             const handle = player.playerHandle
                               ? player.playerHandle
-                              : player.guestPlayerId ? `[Inv.]` : ''
+                              : player.attendanceId ? `[Inv.]` : ''
                             return (
                               <div key={key} className="flex items-center justify-between rounded-md bg-[var(--bg-panel)] px-3 py-2 shadow-sm">
                                 <div className="flex items-center gap-2">
@@ -1098,36 +1082,20 @@ export function MatchesPage() {
           {/* Guests Tab */}
           {detailTab === 'guests' && canManageGuests && (
             <div className="space-y-4">
-              <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" onSubmit={(e) => {
+              <form className="grid grid-cols-1 gap-2" onSubmit={(e) => {
                 e.preventDefault()
                 if (guestFullName.trim()) createGuestMutation.mutate()
               }}>
-                <div className="sm:col-span-1 xl:col-span-1">
+                <div>
                   <label className="ui-form-label">Nombre del invitado</label>
-                  <input className="ui-input" placeholder="Nombre completo" value={guestFullName} onChange={(e) => setGuestFullName(e.target.value)} required />
-                </div>
-                <div className="sm:col-span-1 xl:col-span-1">
-                  <label className="ui-form-label">Apodo (opcional)</label>
-                  <input className="ui-input" placeholder="Apodo" value={guestNickname} onChange={(e) => setGuestNickname(e.target.value)} />
-                </div>
-                <div className="sm:col-span-1 xl:col-span-1">
-                  <label className="ui-form-label">Camiseta (opcional)</label>
-                  <input className="ui-input" type="number" placeholder="Nro" min={1} value={guestShirtNumber || ''} onChange={(e) => setGuestShirtNumber(e.target.value ? Number(e.target.value) : undefined)} />
-                </div>
-                <div className="sm:col-span-2 xl:col-span-1">
-                  <label className="ui-form-label">Posiciones (opcional)</label>
-                  <div className="flex flex-wrap gap-1">
-                    {PLAYER_POSITION_OPTIONS.map((opt) => (
-                      <button key={opt.value} type="button" className={`rounded-md border px-2 py-1 text-xs ${guestPositionCodes.includes(opt.value) ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]' : 'border-[var(--border-soft)]'}`} onClick={() => toggleGuestPosition(opt.value)}>
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div className="flex gap-2">
+                    <input className="ui-input flex-1" placeholder="Nombre completo" value={guestFullName} onChange={(e) => setGuestFullName(e.target.value)} required />
+                    <button className="ui-button" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()} title="Agregar invitado">
+                      <Icon name="user-plus" size="sm" />
+                      <span>{createGuestMutation.isPending ? '...' : 'Agregar'}</span>
+                    </button>
                   </div>
                 </div>
-                <button className="ui-button sm:col-span-2 xl:col-span-4" type="submit" disabled={createGuestMutation.isPending || !guestFullName.trim()} title="Agregar invitado">
-                  <Icon name="user-plus" size="sm" />
-                  <span>{createGuestMutation.isPending ? 'Agregando...' : 'Agregar'}</span>
-                </button>
               </form>
 
               {createGuestMutation.isError && (
@@ -1141,11 +1109,8 @@ export function MatchesPage() {
                   {guestsQuery.data.map((guest) => (
                     <div key={guest.id} className="ui-muted-surface flex items-center justify-between rounded-lg px-3 py-2">
                       <div>
-                        <p className="font-medium">{guest.fullName}</p>
-                        {guest.nickname && <p className="ui-text-muted text-xs">Apodo: {guest.nickname}{guest.shirtNumber ? `#${guest.shirtNumber}` : ''}</p>}
-                        <p className="ui-text-muted text-xs">
-                          {guest.positions.length > 0 ? guest.positions.filter(p => p.isPrimary).map(p => positionLabel(p.positionCode)).join(', ') || guest.positions[0] ? positionLabel(guest.positions[0].positionCode) : 'Sin posicion' : 'Sin posicion'}
-                        </p>
+                        <p className="font-medium">{guest.displayName}</p>
+                        {guest.userId === null && <p className="ui-text-muted text-xs">Invitado externo</p>}
                       </div>
                       <div className="flex items-center gap-1">
                         {guest.status === 'PENDING' && (

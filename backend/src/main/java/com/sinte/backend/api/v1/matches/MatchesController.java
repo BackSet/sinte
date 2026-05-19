@@ -2,7 +2,10 @@ package com.sinte.backend.api.v1.matches;
 
 import com.sinte.backend.config.security.SecurityUtils;
 import com.sinte.backend.domain.Match;
+import com.sinte.backend.domain.Attendance;
+import com.sinte.backend.domain.enums.AttendanceStatus;
 import com.sinte.backend.domain.enums.MatchStatus;
+import com.sinte.backend.service.AttendanceService;
 import com.sinte.backend.service.MatchExportService;
 import com.sinte.backend.service.MatchPairingService;
 import com.sinte.backend.service.MatchService;
@@ -36,11 +39,13 @@ public class MatchesController {
     private final MatchService matchService;
     private final MatchExportService matchExportService;
     private final MatchPairingService pairingService;
+    private final AttendanceService attendanceService;
 
-    public MatchesController(MatchService matchService, MatchExportService matchExportService, MatchPairingService pairingService) {
+    public MatchesController(MatchService matchService, MatchExportService matchExportService, MatchPairingService pairingService, AttendanceService attendanceService) {
         this.matchService = matchService;
         this.matchExportService = matchExportService;
         this.pairingService = pairingService;
+        this.attendanceService = attendanceService;
     }
 
     @PostMapping
@@ -260,6 +265,80 @@ public class MatchesController {
         matchService.getMatch(matchId);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/{matchId}/attendances")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
+    public ResponseEntity<List<AttendanceItemResponse>> listAttendances(@PathVariable UUID matchId) {
+        UUID userId = SecurityUtils.currentUserId();
+        List<Attendance> attendances = attendanceService.getAttendanceByMatch(matchId, userId);
+        return ResponseEntity.ok(attendances.stream().map(this::toAttendanceItem).toList());
+    }
+
+    @PostMapping("/{matchId}/attendances")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
+    public ResponseEntity<AttendanceItemResponse> createExternal(
+            @PathVariable UUID matchId,
+            @Valid @RequestBody CreateExternalRequest request
+    ) {
+        Match match = matchService.getMatch(matchId);
+        Attendance attendance = attendanceService.createExternal(match, request.externalName(), null);
+        return ResponseEntity.ok(toAttendanceItem(attendance));
+    }
+
+    @PutMapping("/{matchId}/attendances/{attendanceId}/status")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
+    public ResponseEntity<AttendanceItemResponse> updateExternalStatus(
+            @PathVariable UUID matchId,
+            @PathVariable UUID attendanceId,
+            @Valid @RequestBody UpdateExternalStatusRequest request
+    ) {
+        Attendance attendance = attendanceService.updateExternalStatus(attendanceId, request.status());
+        return ResponseEntity.ok(toAttendanceItem(attendance));
+    }
+
+    @DeleteMapping("/{matchId}/attendances/{attendanceId}")
+    @PreAuthorize("hasAnyRole('DT','ADMIN','PLAYER')")
+    public ResponseEntity<Void> deleteExternal(
+            @PathVariable UUID matchId,
+            @PathVariable UUID attendanceId
+    ) {
+        attendanceService.deleteExternal(attendanceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private AttendanceItemResponse toAttendanceItem(Attendance a) {
+        return new AttendanceItemResponse(
+                a.getId(),
+                a.getMatch().getId(),
+                a.getUser() != null ? a.getUser().getId() : null,
+                a.getExternalName(),
+                a.getInvitedBy() != null ? a.getInvitedBy().getId() : null,
+                a.getStatus().name(),
+                a.getRespondedAt(),
+                a.getCreatedAt(),
+                a.getDisplayName()
+        );
+    }
+
+    public record CreateExternalRequest(
+            @NotBlank String externalName
+    ) {}
+
+    public record UpdateExternalStatusRequest(
+            @NotNull AttendanceStatus status
+    ) {}
+
+    public record AttendanceItemResponse(
+            UUID id,
+            UUID matchId,
+            UUID userId,
+            String externalName,
+            UUID invitedByUserId,
+            String status,
+            OffsetDateTime respondedAt,
+            OffsetDateTime createdAt,
+            String displayName
+    ) {}
 
     private MatchResponse toResponse(Match match) {
         MatchService.AttendanceSummary attendanceSummary = matchService.getAttendanceSummary(match.getId());
