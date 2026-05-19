@@ -6,7 +6,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.Match;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.enums.MatchSourceType;
@@ -23,7 +22,6 @@ import com.sinte.backend.service.AttendanceService;
 import com.sinte.backend.service.DomainException;
 import com.sinte.backend.service.MatchPairingService;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

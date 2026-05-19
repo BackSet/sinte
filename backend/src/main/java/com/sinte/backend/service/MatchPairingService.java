@@ -410,7 +410,6 @@ public class MatchPairingService {
         attendances.forEach(a -> attendanceMap.put(a.getId(), a));
 
         List<UUID> userIds = confirmedUsers.stream().map(a -> a.getUser().getId()).toList();
-        List<UUID> externalIds = confirmedExternals.stream().map(Attendance::getId).toList();
 
         Map<UUID, String> userPrimary = new HashMap<>();
         Map<UUID, String> userSecondary = new HashMap<>();
