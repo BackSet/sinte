@@ -33,12 +33,12 @@ public class MatchPair {
     private User playerB;
 
     @ManyToOne
-    @JoinColumn(name = "guest_player_a_id")
-    private GuestPlayer guestPlayerA;
+    @JoinColumn(name = "attendance_a_id")
+    private Attendance attendanceA;
 
     @ManyToOne
-    @JoinColumn(name = "guest_player_b_id")
-    private GuestPlayer guestPlayerB;
+    @JoinColumn(name = "attendance_b_id")
+    private Attendance attendanceB;
 
     @Column(name = "position_code", nullable = false, length = 40)
     private String positionCode;
@@ -49,12 +49,12 @@ public class MatchPair {
     protected MatchPair() {
     }
 
-    public MatchPair(Match match, User playerA, User playerB, GuestPlayer guestPlayerA, GuestPlayer guestPlayerB, String positionCode) {
+    public MatchPair(Match match, User playerA, User playerB, Attendance attendanceA, Attendance attendanceB, String positionCode) {
         this.match = match;
         this.playerA = playerA;
         this.playerB = playerB;
-        this.guestPlayerA = guestPlayerA;
-        this.guestPlayerB = guestPlayerB;
+        this.attendanceA = attendanceA;
+        this.attendanceB = attendanceB;
         this.positionCode = positionCode;
     }
 
@@ -79,12 +79,12 @@ public class MatchPair {
         return playerB;
     }
 
-    public GuestPlayer getGuestPlayerA() {
-        return guestPlayerA;
+    public Attendance getAttendanceA() {
+        return attendanceA;
     }
 
-    public GuestPlayer getGuestPlayerB() {
-        return guestPlayerB;
+    public Attendance getAttendanceB() {
+        return attendanceB;
     }
 
     public String getPositionCode() {
@@ -97,13 +97,13 @@ public class MatchPair {
 
     public String getPlayerAName() {
         if (playerA != null) return playerA.getFullName();
-        if (guestPlayerA != null) return guestPlayerA.getFullName();
+        if (attendanceA != null) return attendanceA.getDisplayName();
         return null;
     }
 
     public String getPlayerBName() {
         if (playerB != null) return playerB.getFullName();
-        if (guestPlayerB != null) return guestPlayerB.getFullName();
+        if (attendanceB != null) return attendanceB.getDisplayName();
         return null;
     }
 
@@ -115,5 +115,17 @@ public class MatchPair {
     public String getPlayerBHandle() {
         if (playerB != null) return playerB.getPlayerHandle();
         return null;
+    }
+
+    public boolean isGuestA() {
+        return attendanceA != null && attendanceA.isExternal();
+    }
+
+    public UUID getGuestPlayerAId() {
+        return attendanceA != null ? attendanceA.getId() : null;
+    }
+
+    public UUID getGuestPlayerBId() {
+        return attendanceB != null ? attendanceB.getId() : null;
     }
 }

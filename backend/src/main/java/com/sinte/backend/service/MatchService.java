@@ -1,16 +1,16 @@
 package com.sinte.backend.service;
 
 import com.sinte.backend.domain.Match;
-import com.sinte.backend.domain.MatchAttendance;
+import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.MatchConfig;
-import com.sinte.backend.domain.GuestPlayer;
-import com.sinte.backend.domain.GuestPlayerPosition;
+import com.sinte.backend.domain.MatchPair;
 import com.sinte.backend.domain.MatchSeries;
 import com.sinte.backend.domain.MatchSeriesRule;
 import com.sinte.backend.domain.MatchSeriesTargetGroup;
+import com.sinte.backend.domain.MatchTargetGroup;
 import com.sinte.backend.domain.MatchTeam;
 import com.sinte.backend.domain.MatchTeamPlayer;
-import com.sinte.backend.domain.MatchTargetGroup;
+import com.sinte.backend.domain.MatchTeamPlayer;
 import com.sinte.backend.domain.SinteGroup;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.UserPosition;
@@ -23,7 +23,7 @@ import com.sinte.backend.domain.enums.RoleCode;
 import com.sinte.backend.repository.MatchConfigRepository;
 import com.sinte.backend.repository.MatchPairRepository;
 import com.sinte.backend.repository.MatchRepository;
-import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.repository.AttendanceRepository;
 import com.sinte.backend.repository.MatchSeriesTargetGroupRepository;
 import com.sinte.backend.repository.MatchSeriesRepository;
 import com.sinte.backend.repository.MatchSeriesRuleRepository;
@@ -34,8 +34,6 @@ import com.sinte.backend.repository.SinteGroupRepository;
 import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRoleRepository;
-import com.sinte.backend.repository.GuestPlayerRepository;
-import com.sinte.backend.repository.GuestPlayerPositionRepository;
 import com.sinte.backend.service.dto.CreateMatchRequest;
 import com.sinte.backend.service.dto.CreateMatchSeriesRequest;
 import com.sinte.backend.service.dto.SeriesRuleRequest;
@@ -66,13 +64,11 @@ public class MatchService {
     private final UserRoleRepository userRoleRepository;
     private final MatchTargetGroupRepository matchTargetGroupRepository;
     private final MatchSeriesTargetGroupRepository matchSeriesTargetGroupRepository;
-    private final MatchAttendanceRepository matchAttendanceRepository;
+    private final AttendanceRepository attendanceRepository;
     private final MatchTeamRepository matchTeamRepository;
     private final MatchTeamPlayerRepository matchTeamPlayerRepository;
     private final SinteGroupRepository sinteGroupRepository;
     private final UserPositionRepository userPositionRepository;
-    private final GuestPlayerRepository guestPlayerRepository;
-    private final GuestPlayerPositionRepository guestPlayerPositionRepository;
     private final MatchPairRepository matchPairRepository;
     private final AttendanceService attendanceService;
     private final NotificationService notificationService;
@@ -87,17 +83,15 @@ public class MatchService {
             UserRoleRepository userRoleRepository,
             MatchTargetGroupRepository matchTargetGroupRepository,
             MatchSeriesTargetGroupRepository matchSeriesTargetGroupRepository,
-            MatchAttendanceRepository matchAttendanceRepository,
             MatchTeamRepository matchTeamRepository,
             MatchTeamPlayerRepository matchTeamPlayerRepository,
             SinteGroupRepository sinteGroupRepository,
             UserPositionRepository userPositionRepository,
-            GuestPlayerRepository guestPlayerRepository,
-            GuestPlayerPositionRepository guestPlayerPositionRepository,
             MatchPairRepository matchPairRepository,
             AttendanceService attendanceService,
             NotificationService notificationService,
-            GroupService groupService
+            GroupService groupService,
+            AttendanceRepository attendanceRepository
     ) {
         this.matchRepository = matchRepository;
         this.matchConfigRepository = matchConfigRepository;
@@ -107,17 +101,15 @@ public class MatchService {
         this.userRoleRepository = userRoleRepository;
         this.matchTargetGroupRepository = matchTargetGroupRepository;
         this.matchSeriesTargetGroupRepository = matchSeriesTargetGroupRepository;
-        this.matchAttendanceRepository = matchAttendanceRepository;
         this.matchTeamRepository = matchTeamRepository;
         this.matchTeamPlayerRepository = matchTeamPlayerRepository;
         this.sinteGroupRepository = sinteGroupRepository;
         this.userPositionRepository = userPositionRepository;
-        this.guestPlayerRepository = guestPlayerRepository;
-        this.guestPlayerPositionRepository = guestPlayerPositionRepository;
         this.matchPairRepository = matchPairRepository;
         this.attendanceService = attendanceService;
         this.notificationService = notificationService;
         this.groupService = groupService;
+        this.attendanceRepository = attendanceRepository;
     }
 
     @Transactional
@@ -495,16 +487,8 @@ public class MatchService {
         if (!isDt && !isAdmin) {
             throw new DomainException("Solo DT o ADMIN pueden eliminar partidos");
         }
-        if (!matchRepository.existsById(matchId)) {
+if (!matchRepository.existsById(matchId)) {
             throw new DomainException("Partido no encontrado");
-        }
-        List<UUID> guestIds = guestPlayerRepository.findByMatchIdOrderByRespondedAtAsc(matchId)
-                .stream().map(GuestPlayer::getId).toList();
-        if (!guestIds.isEmpty()) {
-            for (UUID guestId : guestIds) {
-                guestPlayerPositionRepository.deleteByGuestPlayerId(guestId);
-            }
-            guestPlayerPositionRepository.flush();
         }
         matchTeamPlayerRepository.deleteByMatchId(matchId);
         matchTeamPlayerRepository.flush();
@@ -512,14 +496,10 @@ public class MatchService {
         matchTeamRepository.flush();
         matchPairRepository.deleteByMatchId(matchId);
         matchPairRepository.flush();
-        matchAttendanceRepository.deleteByMatchId(matchId);
-        matchAttendanceRepository.flush();
+        attendanceRepository.deleteByMatchId(matchId);
+        attendanceRepository.flush();
         matchTargetGroupRepository.deleteByMatchId(matchId);
         matchTargetGroupRepository.flush();
-        if (!guestIds.isEmpty()) {
-            guestPlayerRepository.deleteByMatchId(matchId);
-            guestPlayerRepository.flush();
-        }
         matchRepository.deleteById(matchId);
     }
 
@@ -646,11 +626,11 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public AttendanceSummary getAttendanceSummary(UUID matchId) {
-        long confirmedCount = matchAttendanceRepository.countByMatchIdAndStatus(
+        long confirmedCount = attendanceRepository.countByMatchIdAndStatus(
                 matchId,
                 AttendanceStatus.YES
         );
-        long pendingCount = matchAttendanceRepository.countByMatchIdAndStatus(
+        long pendingCount = attendanceRepository.countByMatchIdAndStatus(
                 matchId,
                 AttendanceStatus.PENDING
         );
@@ -660,7 +640,7 @@ public class MatchService {
     @Transactional(readOnly = true)
     public List<ConfirmedPlayer> listConfirmedPlayers(UUID requesterUserId, UUID matchId) {
         ensureCanAccessMatch(requesterUserId, matchId);
-        return matchAttendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES).stream()
+        return attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES).stream()
                 .map(attendance -> new ConfirmedPlayer(
                         attendance.getUser().getId(),
                         null,
@@ -674,11 +654,11 @@ public class MatchService {
     @Transactional(readOnly = true)
     public List<ConfirmedPlayer> listConfirmedGuests(UUID requesterUserId, UUID matchId) {
         ensureCanAccessMatch(requesterUserId, matchId);
-        return guestPlayerRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "YES").stream()
+        return attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES).stream()
                 .map(guest -> new ConfirmedPlayer(
                         null,
                         guest.getId(),
-                        guest.getFullName(),
+                        guest.getDisplayName(),
                         null,
                         null
                 ))
@@ -691,14 +671,16 @@ public class MatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new DomainException("Partido no encontrado"));
 
-        List<MatchAttendance> confirmedAttendances = matchAttendanceRepository
+        List<Attendance> confirmedAttendances = attendanceRepository
                 .findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES);
-        List<MatchAttendance> cancelledAttendances = matchAttendanceRepository
+        List<Attendance> cancelledAttendances = attendanceRepository
                 .findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.CANCELLED);
-        List<GuestPlayer> confirmedGuests = guestPlayerRepository
-                .findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "YES");
-        List<GuestPlayer> cancelledGuests = guestPlayerRepository
-                .findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "CANCELLED");
+        List<Attendance> confirmedGuests = confirmedAttendances.stream()
+                .filter(Attendance::isExternal)
+                .toList();
+        List<Attendance> cancelledGuests = cancelledAttendances.stream()
+                .filter(Attendance::isExternal)
+                .toList();
 
         Map<UUID, String> userPositionMap = new HashMap<>();
         if (!confirmedAttendances.isEmpty()) {
@@ -716,20 +698,10 @@ public class MatchService {
         }
 
         Map<UUID, String> guestPositionMap = new HashMap<>();
-        List<GuestPlayer> allGuests = new ArrayList<>(confirmedGuests);
+        List<Attendance> allGuests = new ArrayList<>(confirmedGuests);
         allGuests.addAll(cancelledGuests);
-        if (!allGuests.isEmpty()) {
-            List<UUID> guestIds = allGuests.stream().map(GuestPlayer::getId).distinct().toList();
-            List<GuestPlayerPosition> gPositions = guestPlayerPositionRepository
-                    .findByGuestPlayerIdInOrderByPriority(guestIds);
-            Map<UUID, List<GuestPlayerPosition>> byGuest = gPositions.stream()
-                    .collect(Collectors.groupingBy(gp -> gp.getGuestPlayer().getId()));
-            for (UUID gid : guestIds) {
-                List<GuestPlayerPosition> gps = byGuest.get(gid);
-                if (gps != null && !gps.isEmpty()) {
-                    guestPositionMap.put(gid, gps.get(0).getPositionCode());
-                }
-            }
+        for (Attendance a : allGuests) {
+            guestPositionMap.put(a.getId(), "EXT");
         }
 
         Integer targetPlayers = match.getTargetPlayers();
@@ -738,7 +710,7 @@ public class MatchService {
         List<RosterPlayerEntry> roster = new ArrayList<>();
         List<RosterPlayerEntry> waitlist = new ArrayList<>();
         for (int i = 0; i < confirmedAttendances.size(); i++) {
-            MatchAttendance a = confirmedAttendances.get(i);
+            Attendance a = confirmedAttendances.get(i);
             User u = a.getUser();
             RosterPlayerEntry entry = new RosterPlayerEntry(
                     u.getId(), null, u.getFullName(), u.getEmail(), u.getPlayerHandle(),
@@ -752,9 +724,9 @@ public class MatchService {
             }
         }
 
-        for (GuestPlayer g : confirmedGuests) {
+        for (Attendance g : confirmedGuests) {
             RosterPlayerEntry entry = new RosterPlayerEntry(
-                    null, g.getId(), g.getFullName(), null, null,
+                    null, g.getId(), g.getDisplayName(), null, null,
                     guestPositionMap.getOrDefault(g.getId(), "SIN_POSICION"),
                     g.getRespondedAt()
             );
@@ -766,7 +738,7 @@ public class MatchService {
         }
 
         List<RosterPlayerEntry> cancelled = new ArrayList<>();
-        for (MatchAttendance a : cancelledAttendances) {
+        for (Attendance a : cancelledAttendances) {
             User u = a.getUser();
             cancelled.add(new RosterPlayerEntry(
                     u.getId(), null, u.getFullName(), u.getEmail(), u.getPlayerHandle(),
@@ -774,9 +746,9 @@ public class MatchService {
                     a.getRespondedAt()
             ));
         }
-        for (GuestPlayer g : cancelledGuests) {
+        for (Attendance g : cancelledGuests) {
             cancelled.add(new RosterPlayerEntry(
-                    null, g.getId(), g.getFullName(), null, null,
+                    null, g.getId(), g.getDisplayName(), null, null,
                     guestPositionMap.getOrDefault(g.getId(), "SIN_POSICION"),
                     g.getRespondedAt()
             ));
@@ -800,18 +772,18 @@ public class MatchService {
             throw new DomainException("El tamano de equipo debe ser mayor a 0");
         }
 
-        List<User> confirmedUsers = matchAttendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES).stream()
+        List<User> confirmedUsers = attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES).stream()
                 .map(attendance -> attendance.getUser())
                 .toList();
 
-        List<GuestPlayer> confirmedGuests = guestPlayerRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "YES");
+        List<Attendance> confirmedGuests = attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES);
 
         List<ParticipantInfo> participants = new ArrayList<>();
         for (User user : confirmedUsers) {
             participants.add(new ParticipantInfo(user.getId(), null, user.getFullName(), user.getPlayerHandle(), null));
         }
-        for (GuestPlayer guest : confirmedGuests) {
-            participants.add(new ParticipantInfo(null, guest.getId(), guest.getFullName(), null, null));
+        for (Attendance guest : confirmedGuests) {
+            participants.add(new ParticipantInfo(null, guest.getId(), guest.getDisplayName(), null, null));
         }
 
         if (participants.isEmpty()) {
@@ -834,22 +806,12 @@ public class MatchService {
         }
 
         Map<UUID, String> guestPositionMap = new HashMap<>();
-        if (!confirmedGuests.isEmpty()) {
-            List<GuestPlayerPosition> guestPositions = guestPlayerPositionRepository.findByGuestPlayerIdInOrderByPriority(
-                    confirmedGuests.stream().map(GuestPlayer::getId).toList()
-            );
-            Map<UUID, List<GuestPlayerPosition>> byGuest = guestPositions.stream()
-                    .collect(Collectors.groupingBy(gp -> gp.getGuestPlayer().getId()));
-            for (GuestPlayer guest : confirmedGuests) {
-                List<GuestPlayerPosition> gps = byGuest.get(guest.getId());
-                if (gps != null && !gps.isEmpty()) {
-                    guestPositionMap.put(guest.getId(), gps.get(0).getPositionCode());
-                }
-            }
+        for (Attendance guest : confirmedGuests) {
+            guestPositionMap.put(guest.getId(), "EXT");
         }
 
         for (ParticipantInfo p : participants) {
-            String pos = p.userId != null ? userPositionMap.get(p.userId) : guestPositionMap.get(p.guestPlayerId);
+            String pos = p.userId != null ? userPositionMap.get(p.userId) : guestPositionMap.get(p.attendanceId);
             p.primaryPositionCode = pos != null ? pos : "SIN_POSICION";
         }
 
@@ -877,7 +839,7 @@ public class MatchService {
             for (ParticipantInfo p : group) {
                 builders.get(currentTeam).players.add(new TeamPlayerView(
                         p.userId,
-                        p.guestPlayerId,
+                        p.attendanceId,
                         p.fullName,
                         p.playerHandle,
                         p.primaryPositionCode
@@ -898,14 +860,14 @@ public class MatchService {
 
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new DomainException("Partido no encontrado"));
-        List<UUID> confirmedUserIds = matchAttendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES)
-                .stream()
-                .map(attendance -> attendance.getUser().getId())
+        List<Attendance> yesAttendances = attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES);
+        List<UUID> confirmedUserIds = yesAttendances.stream()
+                .filter(a -> a.getUser() != null)
+                .map(a -> a.getUser().getId())
                 .toList();
-
-        List<UUID> confirmedGuestIds = guestPlayerRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "YES")
-                .stream()
-                .map(GuestPlayer::getId)
+        List<UUID> confirmedGuestIds = yesAttendances.stream()
+                .filter(Attendance::isExternal)
+                .map(Attendance::getId)
                 .toList();
 
         matchTeamPlayerRepository.deleteByMatchId(matchId);
@@ -934,12 +896,12 @@ public class MatchService {
                 }
             }
 
-            if (assignment.guestPlayerIds() != null) {
-                for (UUID guestId : assignment.guestPlayerIds()) {
+            if (assignment.attendanceIds() != null) {
+                for (UUID guestId : assignment.attendanceIds()) {
                     if (!confirmedGuestIds.contains(guestId)) {
                         throw new DomainException("Solo se pueden asignar invitados confirmados");
                     }
-                    GuestPlayer guest = guestPlayerRepository.findById(guestId)
+                    Attendance guest = attendanceRepository.findById(guestId)
                             .orElseThrow(() -> new DomainException("Invitado no encontrado"));
                     savedPlayers.add(new MatchTeamPlayer(team, guest));
                 }
@@ -1017,7 +979,7 @@ public class MatchService {
     private void ensureCanAccessMatch(UUID requesterUserId, UUID matchId) {
         boolean admin = isAdmin(requesterUserId);
         boolean dt = isDt(requesterUserId);
-        if (admin || dt || matchAttendanceRepository.existsByMatchIdAndUserId(matchId, requesterUserId)) {
+        if (admin || dt || attendanceRepository.existsByMatchIdAndUserId(matchId, requesterUserId)) {
             return;
         }
         throw new DomainException("No tienes permisos para ver este partido");
@@ -1046,18 +1008,12 @@ public class MatchService {
 
         List<UUID> guestIds = players.stream()
                 .filter(MatchTeamPlayer::isGuest)
-                .map(p -> p.getGuestPlayer().getId())
+                .map(p -> p.getAttendance().getId())
                 .distinct()
                 .toList();
         if (!guestIds.isEmpty()) {
-            List<GuestPlayerPosition> guestPositions = guestPlayerPositionRepository.findByGuestPlayerIdInOrderByPriority(guestIds);
-            Map<UUID, List<GuestPlayerPosition>> byGuest = guestPositions.stream()
-                    .collect(Collectors.groupingBy(gp -> gp.getGuestPlayer().getId()));
             for (UUID gid : guestIds) {
-                List<GuestPlayerPosition> gps = byGuest.get(gid);
-                if (gps != null && !gps.isEmpty()) {
-                    guestPositionMap.put(gid, gps.get(0).getPositionCode());
-                }
+                guestPositionMap.put(gid, "EXT");
             }
         }
 
@@ -1070,10 +1026,10 @@ public class MatchService {
                                 .map(player -> {
                                     String position = player.getUser() != null
                                             ? userPositionMap.get(player.getUser().getId())
-                                            : (player.getGuestPlayer() != null ? guestPositionMap.get(player.getGuestPlayer().getId()) : null);
+                                            : (player.getAttendance() != null ? guestPositionMap.get(player.getAttendance().getId()) : null);
                                     return new TeamPlayerView(
                                             player.getUser() != null ? player.getUser().getId() : null,
-                                            player.getGuestPlayer() != null ? player.getGuestPlayer().getId() : null,
+                                            player.getAttendance() != null ? player.getAttendance().getId() : null,
                                             player.getPlayerName(),
                                             player.getPlayerHandle(),
                                             position != null ? position : "SIN_POSICION"
@@ -1122,7 +1078,7 @@ public class MatchService {
 
     public record ConfirmedPlayer(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String email,
             String playerHandle
@@ -1131,7 +1087,7 @@ public class MatchService {
 
     public record TeamPlayerView(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String playerHandle,
             String primaryPositionCode
@@ -1149,13 +1105,13 @@ public class MatchService {
             Integer teamNumber,
             String name,
             List<UUID> playerIds,
-            List<UUID> guestPlayerIds
+            List<UUID> attendanceIds
     ) {
     }
 
     public record RosterPlayerEntry(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String email,
             String playerHandle,
@@ -1200,14 +1156,14 @@ public class MatchService {
 
     private static class ParticipantInfo {
         final UUID userId;
-        final UUID guestPlayerId;
+        final UUID attendanceId;
         final String fullName;
         final String playerHandle;
         String primaryPositionCode;
 
-        ParticipantInfo(UUID userId, UUID guestPlayerId, String fullName, String playerHandle, String primaryPositionCode) {
+        ParticipantInfo(UUID userId, UUID attendanceId, String fullName, String playerHandle, String primaryPositionCode) {
             this.userId = userId;
-            this.guestPlayerId = guestPlayerId;
+            this.attendanceId = attendanceId;
             this.fullName = fullName;
             this.playerHandle = playerHandle;
             this.primaryPositionCode = primaryPositionCode;

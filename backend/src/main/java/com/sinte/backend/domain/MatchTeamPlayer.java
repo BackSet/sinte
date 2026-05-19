@@ -29,8 +29,8 @@ public class MatchTeamPlayer {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "guest_player_id")
-    private GuestPlayer guestPlayer;
+    @JoinColumn(name = "attendance_id")
+    private Attendance attendance;
 
     @ManyToOne
     @JoinColumn(name = "pair_id")
@@ -47,9 +47,9 @@ public class MatchTeamPlayer {
         this.user = user;
     }
 
-    public MatchTeamPlayer(MatchTeam team, GuestPlayer guestPlayer) {
+    public MatchTeamPlayer(MatchTeam team, Attendance attendance) {
         this.team = team;
-        this.guestPlayer = guestPlayer;
+        this.attendance = attendance;
     }
 
     public MatchTeamPlayer(MatchTeam team, User user, MatchPair pair) {
@@ -58,9 +58,9 @@ public class MatchTeamPlayer {
         this.pair = pair;
     }
 
-    public MatchTeamPlayer(MatchTeam team, GuestPlayer guestPlayer, MatchPair pair) {
+    public MatchTeamPlayer(MatchTeam team, Attendance attendance, MatchPair pair) {
         this.team = team;
-        this.guestPlayer = guestPlayer;
+        this.attendance = attendance;
         this.pair = pair;
     }
 
@@ -81,20 +81,20 @@ public class MatchTeamPlayer {
         return user;
     }
 
-    public GuestPlayer getGuestPlayer() {
-        return guestPlayer;
+    public Attendance getAttendance() {
+        return attendance;
     }
 
     public boolean isGuest() {
-        return guestPlayer != null;
+        return attendance != null && attendance.isExternal();
     }
 
     public String getPlayerName() {
         if (user != null) {
             return user.getFullName();
         }
-        if (guestPlayer != null) {
-            return guestPlayer.getFullName();
+        if (attendance != null) {
+            return attendance.getDisplayName();
         }
         return null;
     }
@@ -103,14 +103,15 @@ public class MatchTeamPlayer {
         if (user != null) {
             return user.getPlayerHandle();
         }
-        if (guestPlayer != null) {
-            String handle = guestPlayer.getNickname();
-            if (guestPlayer.getShirtNumber() != null) {
-                handle += "#" + guestPlayer.getShirtNumber();
-            }
-            return handle;
-        }
         return null;
+    }
+
+    public UUID getUserId() {
+        return user != null ? user.getId() : null;
+    }
+
+    public UUID getAttendanceId() {
+        return attendance != null ? attendance.getId() : null;
     }
 
     public MatchPair getPair() {

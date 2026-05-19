@@ -1,18 +1,15 @@
 package com.sinte.backend.service;
 
-import com.sinte.backend.domain.GuestPlayer;
-import com.sinte.backend.domain.GuestPlayerPosition;
+import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.Match;
-import com.sinte.backend.domain.MatchAttendance;
 import com.sinte.backend.domain.MatchPair;
 import com.sinte.backend.domain.MatchTeam;
 import com.sinte.backend.domain.MatchTeamPlayer;
 import com.sinte.backend.domain.User;
 import com.sinte.backend.domain.UserPosition;
 import com.sinte.backend.domain.enums.AttendanceStatus;
-import com.sinte.backend.repository.GuestPlayerPositionRepository;
-import com.sinte.backend.repository.GuestPlayerRepository;
-import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.domain.enums.RoleCode;
+import com.sinte.backend.repository.AttendanceRepository;
 import com.sinte.backend.repository.MatchPairRepository;
 import com.sinte.backend.repository.MatchRepository;
 import com.sinte.backend.repository.MatchTeamPlayerRepository;
@@ -20,13 +17,12 @@ import com.sinte.backend.repository.MatchTeamRepository;
 import com.sinte.backend.repository.UserPositionRepository;
 import com.sinte.backend.repository.UserRepository;
 import com.sinte.backend.repository.UserRoleRepository;
-import com.sinte.backend.domain.enums.RoleCode;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -35,10 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MatchPairingService {
 
-    private final MatchAttendanceRepository matchAttendanceRepository;
-    private final GuestPlayerRepository guestPlayerRepository;
+    private final AttendanceRepository attendanceRepository;
     private final UserPositionRepository userPositionRepository;
-    private final GuestPlayerPositionRepository guestPlayerPositionRepository;
     private final MatchPairRepository matchPairRepository;
     private final MatchTeamRepository matchTeamRepository;
     private final MatchTeamPlayerRepository matchTeamPlayerRepository;
@@ -47,10 +41,8 @@ public class MatchPairingService {
     private final UserRoleRepository userRoleRepository;
 
     public MatchPairingService(
-            MatchAttendanceRepository matchAttendanceRepository,
-            GuestPlayerRepository guestPlayerRepository,
+            AttendanceRepository attendanceRepository,
             UserPositionRepository userPositionRepository,
-            GuestPlayerPositionRepository guestPlayerPositionRepository,
             MatchPairRepository matchPairRepository,
             MatchTeamRepository matchTeamRepository,
             MatchTeamPlayerRepository matchTeamPlayerRepository,
@@ -58,10 +50,8 @@ public class MatchPairingService {
             UserRepository userRepository,
             UserRoleRepository userRoleRepository
     ) {
-        this.matchAttendanceRepository = matchAttendanceRepository;
-        this.guestPlayerRepository = guestPlayerRepository;
+        this.attendanceRepository = attendanceRepository;
         this.userPositionRepository = userPositionRepository;
-        this.guestPlayerPositionRepository = guestPlayerPositionRepository;
         this.matchPairRepository = matchPairRepository;
         this.matchTeamRepository = matchTeamRepository;
         this.matchTeamPlayerRepository = matchTeamPlayerRepository;
@@ -86,7 +76,7 @@ public class MatchPairingService {
 
     public record PairingPlayer(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String playerHandle,
             String primaryPositionCode,
@@ -99,15 +89,15 @@ public class MatchPairingService {
         ensureCanManageMatch(requesterUserId, matchId);
         MatchMatchups matchups = loadMatchups(matchId);
         List<PairingPlayer> allPlayers = new ArrayList<>(matchups.users);
-        allPlayers.addAll(matchups.guests);
+        allPlayers.addAll(matchups.externals);
 
         List<PairView> pairs = buildPairs(matchups, allPlayers);
         List<PairingPlayer> unpaired = allPlayers.stream()
                 .filter(p -> pairs.stream().noneMatch(pair ->
                         (pair.playerA().userId() != null && pair.playerA().userId().equals(p.userId())) ||
-                        (pair.playerA().guestPlayerId() != null && pair.playerA().guestPlayerId().equals(p.guestPlayerId())) ||
+                        (pair.playerA().attendanceId() != null && pair.playerA().attendanceId().equals(p.attendanceId())) ||
                         (pair.playerB().userId() != null && pair.playerB().userId().equals(p.userId())) ||
-                        (pair.playerB().guestPlayerId() != null && pair.playerB().guestPlayerId().equals(p.guestPlayerId()))
+                        (pair.playerB().attendanceId() != null && pair.playerB().attendanceId().equals(p.attendanceId()))
                 ))
                 .toList();
 
@@ -121,26 +111,26 @@ public class MatchPairingService {
         ensureCanManageMatch(requesterUserId, matchId);
         matchPairRepository.deleteByMatchId(matchId);
         matchPairRepository.flush();
-        
+
         MatchMatchups matchups = loadMatchups(matchId);
         List<PairingPlayer> allPlayers = new ArrayList<>(matchups.users);
-        allPlayers.addAll(matchups.guests);
+        allPlayers.addAll(matchups.externals);
 
         List<MatchPair> createdPairs = new ArrayList<>();
         List<PairView> pairViews = new ArrayList<>();
 
         Map<UUID, String> userPrimaryPosition = new HashMap<>();
         Map<UUID, String> userSecondaryPosition = new HashMap<>();
-        Map<UUID, String> guestPrimaryPosition = new HashMap<>();
-        Map<UUID, String> guestSecondaryPosition = new HashMap<>();
+        Map<UUID, String> externalPrimaryPosition = new HashMap<>();
+        Map<UUID, String> externalSecondaryPosition = new HashMap<>();
 
         for (PairingPlayer p : matchups.users) {
             userPrimaryPosition.put(p.userId, p.primaryPositionCode);
             userSecondaryPosition.put(p.userId, p.secondaryPositionCode);
         }
-        for (PairingPlayer p : matchups.guests) {
-            guestPrimaryPosition.put(p.guestPlayerId, p.primaryPositionCode);
-            guestSecondaryPosition.put(p.guestPlayerId, p.secondaryPositionCode);
+        for (PairingPlayer p : matchups.externals) {
+            externalPrimaryPosition.put(p.attendanceId, p.primaryPositionCode);
+            externalSecondaryPosition.put(p.attendanceId, p.secondaryPositionCode);
         }
 
         List<PairingPlayer> primaryGrouped = new ArrayList<>(allPlayers);
@@ -168,8 +158,8 @@ public class MatchPairingService {
                         matchups.match,
                         a.userId != null ? matchups.userMap.get(a.userId) : null,
                         b.userId != null ? matchups.userMap.get(b.userId) : null,
-                        a.guestPlayerId != null ? matchups.guestMap.get(a.guestPlayerId) : null,
-                        b.guestPlayerId != null ? matchups.guestMap.get(b.guestPlayerId) : null,
+                        a.attendanceId != null ? matchups.attendanceMap.get(a.attendanceId) : null,
+                        b.attendanceId != null ? matchups.attendanceMap.get(b.attendanceId) : null,
                         entry.getKey()
                 );
                 createdPairs.add(matchPairRepository.save(pair));
@@ -196,8 +186,8 @@ public class MatchPairingService {
                             matchups.match,
                             p.userId != null ? matchups.userMap.get(p.userId) : null,
                             b.userId != null ? matchups.userMap.get(b.userId) : null,
-                            p.guestPlayerId != null ? matchups.guestMap.get(p.guestPlayerId) : null,
-                            b.guestPlayerId != null ? matchups.guestMap.get(b.guestPlayerId) : null,
+                            p.attendanceId != null ? matchups.attendanceMap.get(p.attendanceId) : null,
+                            b.attendanceId != null ? matchups.attendanceMap.get(b.attendanceId) : null,
                             secondary
                     );
                     createdPairs.add(matchPairRepository.save(pair));
@@ -211,21 +201,21 @@ public class MatchPairingService {
             pairViews.add(new PairView(
                     pair.getId(),
                     pair.getPositionCode(),
-                    toPairingPlayer(pair.getPlayerA(), pair.getGuestPlayerA(), pair.getPositionCode(), userPrimaryPosition, guestPrimaryPosition),
-                    toPairingPlayer(pair.getPlayerB(), pair.getGuestPlayerB(), pair.getPositionCode(), userPrimaryPosition, guestPrimaryPosition)
+                    toPairingPlayer(pair.getPlayerA(), pair.getAttendanceA(), pair.getPositionCode(), userPrimaryPosition, externalPrimaryPosition),
+                    toPairingPlayer(pair.getPlayerB(), pair.getAttendanceB(), pair.getPositionCode(), userPrimaryPosition, externalPrimaryPosition)
             ));
         }
 
         for (PairingPlayer p : allPlayers) {
             if (used.stream().noneMatch(u -> u.userId() != null && u.userId().equals(p.userId()) ||
-                    u.guestPlayerId() != null && u.guestPlayerId().equals(p.guestPlayerId()))) {
+                    u.attendanceId() != null && u.attendanceId().equals(p.attendanceId()))) {
                 used.add(p);
             }
         }
         List<PairingPlayer> unpairedList = allPlayers.stream()
                 .filter(p -> used.stream().noneMatch(u ->
                         (u.userId() != null && u.userId().equals(p.userId())) ||
-                        (u.guestPlayerId() != null && u.guestPlayerId().equals(p.guestPlayerId()))
+                        (u.attendanceId() != null && u.attendanceId().equals(p.attendanceId()))
                 ))
                 .toList();
 
@@ -254,15 +244,15 @@ public class MatchPairingService {
 
         for (MatchPair pair : pairs) {
             List<User> users = new ArrayList<>();
-            List<GuestPlayer> guests = new ArrayList<>();
+            List<Attendance> attendances = new ArrayList<>();
             if (pair.getPlayerA() != null) users.add(pair.getPlayerA());
             if (pair.getPlayerB() != null) users.add(pair.getPlayerB());
-            if (pair.getGuestPlayerA() != null) guests.add(pair.getGuestPlayerA());
-            if (pair.getGuestPlayerB() != null) guests.add(pair.getGuestPlayerB());
+            if (pair.getAttendanceA() != null) attendances.add(pair.getAttendanceA());
+            if (pair.getAttendanceB() != null) attendances.add(pair.getAttendanceB());
 
             List<Object> allMembers = new ArrayList<>();
             allMembers.addAll(users);
-            allMembers.addAll(guests);
+            allMembers.addAll(attendances);
             Collections.shuffle(allMembers);
 
             Object first = allMembers.get(0);
@@ -274,7 +264,7 @@ public class MatchPairingService {
             if (first instanceof User u) {
                 playerA = new MatchTeamPlayer(teamA, u, pair);
             } else {
-                playerA = new MatchTeamPlayer(teamA, (GuestPlayer) first, pair);
+                playerA = new MatchTeamPlayer(teamA, (Attendance) first, pair);
             }
             matchTeamPlayerRepository.save(playerA);
 
@@ -282,14 +272,14 @@ public class MatchPairingService {
                 if (second instanceof User u) {
                     playerB = new MatchTeamPlayer(teamB, u, pair);
                 } else {
-                    playerB = new MatchTeamPlayer(teamB, (GuestPlayer) second, pair);
+                    playerB = new MatchTeamPlayer(teamB, (Attendance) second, pair);
                 }
                 matchTeamPlayerRepository.save(playerB);
             } else {
                 if (first instanceof User u) {
                     playerB = new MatchTeamPlayer(teamB, u, pair);
                 } else {
-                    playerB = new MatchTeamPlayer(teamB, (GuestPlayer) first, pair);
+                    playerB = new MatchTeamPlayer(teamB, (Attendance) first, pair);
                 }
                 matchTeamPlayerRepository.save(playerB);
             }
@@ -316,45 +306,39 @@ public class MatchPairingService {
     }
 
     @Transactional
-    public PairingResult createManualPair(UUID matchId, UUID requesterUserId, UUID playerAId, UUID playerBId, UUID guestPlayerAId, UUID guestPlayerBId, String positionCode) {
+    public PairingResult createManualPair(UUID matchId, UUID requesterUserId, UUID playerAId, UUID playerBId, UUID attendanceAId, UUID attendanceBId, String positionCode) {
         ensureCanManageMatch(requesterUserId, matchId);
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new DomainException("Partido no encontrado"));
 
         User playerA = playerAId != null ? userRepository.findById(playerAId).orElse(null) : null;
         User playerB = playerBId != null ? userRepository.findById(playerBId).orElse(null) : null;
-        GuestPlayer guestA = requireGuestForMatch(matchId, guestPlayerAId);
-        GuestPlayer guestB = requireGuestForMatch(matchId, guestPlayerBId);
+        Attendance attA = requireAttendanceForMatch(matchId, attendanceAId);
+        Attendance attB = requireAttendanceForMatch(matchId, attendanceBId);
 
-        if (playerA == null && guestA == null) {
+        if (playerA == null && attA == null) {
             throw new DomainException("Debe especificar al menos un jugador A");
         }
-        if (playerB == null && guestB == null) {
+        if (playerB == null && attB == null) {
             throw new DomainException("Debe especificar al menos un jugador B");
         }
 
-        MatchPair pair = new MatchPair(match, playerA, playerB, guestA, guestB, positionCode);
+        MatchPair pair = new MatchPair(match, playerA, playerB, attA, attB, positionCode);
         matchPairRepository.save(pair);
 
         List<UUID> userIds = new ArrayList<>();
-        List<UUID> guestIds = new ArrayList<>();
+        List<UUID> attendanceIds = new ArrayList<>();
         if (playerA != null) userIds.add(playerA.getId());
         if (playerB != null) userIds.add(playerB.getId());
-        if (guestA != null) guestIds.add(guestA.getId());
-        if (guestB != null) guestIds.add(guestB.getId());
+        if (attA != null) attendanceIds.add(attA.getId());
+        if (attB != null) attendanceIds.add(attB.getId());
 
         Map<UUID, String> userPrimary = new HashMap<>();
-        Map<UUID, String> guestPrimary = new HashMap<>();
+        Map<UUID, String> extPrimary = new HashMap<>();
         if (!userIds.isEmpty()) {
             List<UserPosition> upList = userPositionRepository.findByUserIdInOrderByPriority(userIds);
             for (UserPosition up : upList) {
                 userPrimary.putIfAbsent(up.getUser().getId(), up.getPositionCode());
-            }
-        }
-        if (!guestIds.isEmpty()) {
-            List<GuestPlayerPosition> gpList = guestPlayerPositionRepository.findByGuestPlayerIdInOrderByPriority(guestIds);
-            for (GuestPlayerPosition gp : gpList) {
-                guestPrimary.putIfAbsent(gp.getGuestPlayer().getId(), gp.getPositionCode());
             }
         }
 
@@ -364,10 +348,10 @@ public class MatchPairingService {
         int total = 0;
 
         for (MatchPair p : savedPairs) {
-            PairingPlayer pa = toPairingPlayer(p.getPlayerA(), p.getGuestPlayerA(), p.getPositionCode(), userPrimary, guestPrimary);
-            PairingPlayer pb = toPairingPlayer(p.getPlayerB(), p.getGuestPlayerB(), p.getPositionCode(), userPrimary, guestPrimary);
+            PairingPlayer pa = toPairingPlayer(p.getPlayerA(), p.getAttendanceA(), p.getPositionCode(), userPrimary, extPrimary);
+            PairingPlayer pb = toPairingPlayer(p.getPlayerB(), p.getAttendanceB(), p.getPositionCode(), userPrimary, extPrimary);
             pairViews.add(new PairView(p.getId(), p.getPositionCode(), pa, pb));
-            total += (pa.userId() != null || pa.guestPlayerId() != null ? 1 : 0) + (pb.userId() != null || pb.guestPlayerId() != null ? 1 : 0);
+            total += (pa.userId() != null || pa.attendanceId() != null ? 1 : 0) + (pb.userId() != null || pb.attendanceId() != null ? 1 : 0);
         }
 
         return new PairingResult(pairViews, unpaired, false, total);
@@ -384,16 +368,16 @@ public class MatchPairingService {
         matchPairRepository.delete(pair);
     }
 
-    private GuestPlayer requireGuestForMatch(UUID matchId, UUID guestPlayerId) {
-        if (guestPlayerId == null) {
+    private Attendance requireAttendanceForMatch(UUID matchId, UUID attendanceId) {
+        if (attendanceId == null) {
             return null;
         }
-        GuestPlayer guest = guestPlayerRepository.findById(guestPlayerId)
-                .orElseThrow(() -> new DomainException("Invitado no encontrado"));
-        if (!guest.getMatch().getId().equals(matchId)) {
-            throw new DomainException("El invitado no pertenece al partido indicado");
+        Attendance att = attendanceRepository.findById(attendanceId)
+                .orElseThrow(() -> new DomainException("Asistente no encontrado"));
+        if (!att.getMatch().getId().equals(matchId)) {
+            throw new DomainException("El asistente no pertenece al partido indicado");
         }
-        return guest;
+        return att;
     }
 
     private void ensureCanManageMatch(UUID requesterUserId, UUID matchId) {
@@ -407,26 +391,26 @@ public class MatchPairingService {
     }
 
     private MatchMatchups loadMatchups(UUID matchId) {
-        List<MatchAttendance> attendances = matchAttendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES);
+        List<Attendance> attendances = attendanceRepository.findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, AttendanceStatus.YES);
         if (attendances.isEmpty()) {
             throw new DomainException("No hay asistentes confirmados");
         }
         Match match = attendances.get(0).getMatch();
 
-        List<User> confirmedUsers = attendances.stream()
-                .map(ma -> ma.getUser())
+        List<Attendance> confirmedUsers = attendances.stream()
+                .filter(a -> a.getUser() != null)
+                .toList();
+        List<Attendance> confirmedExternals = attendances.stream()
+                .filter(a -> a.isExternal())
                 .toList();
 
-        List<GuestPlayer> confirmedGuests = guestPlayerRepository
-                .findByMatchIdAndStatusOrderByRespondedAtAsc(matchId, "YES");
-
         Map<UUID, User> userMap = new HashMap<>();
-        confirmedUsers.forEach(u -> userMap.put(u.getId(), u));
-        Map<UUID, GuestPlayer> guestMap = new HashMap<>();
-        confirmedGuests.forEach(g -> guestMap.put(g.getId(), g));
+        confirmedUsers.forEach(a -> userMap.put(a.getUser().getId(), a.getUser()));
+        Map<UUID, Attendance> attendanceMap = new HashMap<>();
+        attendances.forEach(a -> attendanceMap.put(a.getId(), a));
 
-        List<UUID> userIds = confirmedUsers.stream().map(User::getId).toList();
-        List<UUID> guestIds = confirmedGuests.stream().map(GuestPlayer::getId).toList();
+        List<UUID> userIds = confirmedUsers.stream().map(a -> a.getUser().getId()).toList();
+        List<UUID> externalIds = confirmedExternals.stream().map(Attendance::getId).toList();
 
         Map<UUID, String> userPrimary = new HashMap<>();
         Map<UUID, String> userSecondary = new HashMap<>();
@@ -443,46 +427,29 @@ public class MatchPairingService {
             }
         }
 
-        Map<UUID, String> guestPrimary = new HashMap<>();
-        Map<UUID, String> guestSecondary = new HashMap<>();
-        if (!guestIds.isEmpty()) {
-            List<GuestPlayerPosition> gpList = guestPlayerPositionRepository.findByGuestPlayerIdInOrderByPriority(guestIds);
-            Map<UUID, List<GuestPlayerPosition>> byGuest = gpList.stream()
-                    .collect(Collectors.groupingBy(gp -> gp.getGuestPlayer().getId()));
-            for (UUID gid : guestIds) {
-                List<GuestPlayerPosition> gps = byGuest.get(gid);
-                if (gps != null && !gps.isEmpty()) {
-                    guestPrimary.put(gid, gps.stream().filter(GuestPlayerPosition::isPrimary).findFirst().orElse(gps.get(0)).getPositionCode());
-                    guestSecondary.put(gid, gps.size() > 1 ? gps.stream().filter(g -> !g.isPrimary()).findFirst().map(GuestPlayerPosition::getPositionCode).orElse(null) : null);
-                }
-            }
-        }
+        Map<UUID, String> extPrimary = new HashMap<>();
+        Map<UUID, String> extSecondary = new HashMap<>();
 
         List<PairingPlayer> pairingUsers = confirmedUsers.stream()
-                .map(u -> new PairingPlayer(
-                        u.getId(), null, u.getFullName(), u.getPlayerHandle(),
-                        userPrimary.getOrDefault(u.getId(), "SIN_POSICION"),
-                        userSecondary.getOrDefault(u.getId(), null), true))
+                .map(a -> new PairingPlayer(
+                        a.getUser().getId(), null, a.getUser().getFullName(), a.getUser().getPlayerHandle(),
+                        userPrimary.getOrDefault(a.getUser().getId(), "SIN_POSICION"),
+                        userSecondary.getOrDefault(a.getUser().getId(), null), true))
                 .toList();
 
-        List<PairingPlayer> pairingGuests = confirmedGuests.stream()
-                .map(g -> {
-                    String handle = g.getNickname() != null ? g.getNickname() : g.getFullName();
-                    if (g.getShirtNumber() != null) handle += "#" + g.getShirtNumber();
-                    return new PairingPlayer(
-                            null, g.getId(), g.getFullName(), handle,
-                            guestPrimary.getOrDefault(g.getId(), "SIN_POSICION"),
-                            guestSecondary.getOrDefault(g.getId(), null), true);
-                })
+        List<PairingPlayer> pairingExternals = confirmedExternals.stream()
+                .map(a -> new PairingPlayer(
+                        null, a.getId(), a.getDisplayName(), null,
+                        extPrimary.getOrDefault(a.getId(), "SIN_POSICION"),
+                        extSecondary.getOrDefault(a.getId(), null), true))
                 .toList();
 
-        return new MatchMatchups(match, match.getTargetPlayers(), userMap, guestMap, pairingUsers, pairingGuests);
+        return new MatchMatchups(match, match.getTargetPlayers(), userMap, attendanceMap, pairingUsers, pairingExternals);
     }
 
     private List<PairView> buildPairs(MatchMatchups matchups, List<PairingPlayer> allPlayers) {
         List<PairView> pairs = new ArrayList<>();
 
-        // Empleamos la misma lógica de executePairing pero sin persistir en DB.
         List<PairingPlayer> primaryGrouped = new ArrayList<>(allPlayers);
         Collections.sort(primaryGrouped, (a, b) -> {
             String posA = getPrimaryPositionCode(a);
@@ -551,9 +518,8 @@ public class MatchPairingService {
     }
 
     private UUID syntheticPairId(String positionCode, PairingPlayer a, PairingPlayer b) {
-        String aId = a.userId() != null ? a.userId().toString() : a.guestPlayerId().toString();
-        String bId = b.userId() != null ? b.userId().toString() : b.guestPlayerId().toString();
-        // Generador determinístico para que el preview sea estable entre refrescos.
+        String aId = a.userId() != null ? a.userId().toString() : a.attendanceId().toString();
+        String bId = b.userId() != null ? b.userId().toString() : b.attendanceId().toString();
         return UUID.nameUUIDFromBytes((positionCode + "|" + aId + "|" + bId).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -565,14 +531,12 @@ public class MatchPairingService {
         return p.secondaryPositionCode();
     }
 
-    private PairingPlayer toPairingPlayer(User user, GuestPlayer guest, String positionCode, Map<UUID, String> userPrimary, Map<UUID, String> guestPrimary) {
+    private PairingPlayer toPairingPlayer(User user, Attendance attendance, String positionCode, Map<UUID, String> userPrimary, Map<UUID, String> extPrimary) {
         if (user != null) {
             return new PairingPlayer(user.getId(), null, user.getFullName(), user.getPlayerHandle(), positionCode, null, true);
         }
-        if (guest != null) {
-            String handle = guest.getNickname();
-            if (guest.getShirtNumber() != null) handle += "#" + guest.getShirtNumber();
-            return new PairingPlayer(null, guest.getId(), guest.getFullName(), handle, positionCode, null, true);
+        if (attendance != null) {
+            return new PairingPlayer(null, attendance.getId(), attendance.getDisplayName(), null, positionCode, null, true);
         }
         return new PairingPlayer(null, null, null, null, positionCode, null, true);
     }
@@ -581,9 +545,9 @@ public class MatchPairingService {
             Match match,
             Integer targetPlayers,
             Map<UUID, User> userMap,
-            Map<UUID, GuestPlayer> guestMap,
+            Map<UUID, Attendance> attendanceMap,
             List<PairingPlayer> users,
-            List<PairingPlayer> guests
+            List<PairingPlayer> externals
     ) {}
 
     public record TeamAssignmentResult(

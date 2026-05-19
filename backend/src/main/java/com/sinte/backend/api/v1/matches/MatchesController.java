@@ -117,7 +117,7 @@ public class MatchesController {
         List<ConfirmedPlayerResponse> guests = matchService.listConfirmedGuests(userId, matchId).stream()
                 .map(player -> new ConfirmedPlayerResponse(
                         null,
-                        player.guestPlayerId(),
+                        player.attendanceId(),
                         player.fullName(),
                         null,
                         null
@@ -171,7 +171,7 @@ public class MatchesController {
                         team.teamNumber(),
                         team.name(),
                         team.playerIds(),
-                        team.guestPlayerIds()
+                        team.attendanceIds()
                 ))
                 .toList();
         List<TeamResponse> teams = matchService.saveTeams(userId, matchId, assignments).stream()
@@ -221,8 +221,8 @@ public class MatchesController {
                 userId,
                 request.playerAId(),
                 request.playerBId(),
-                request.guestPlayerAId(),
-                request.guestPlayerBId(),
+                request.attendanceAId(),
+                request.attendanceBId(),
                 request.positionCode()
         );
         return ResponseEntity.ok(toPairingPreviewResponse(result));
@@ -295,7 +295,7 @@ public class MatchesController {
                 team.players().stream()
                         .map(player -> new TeamPlayerResponse(
                                 player.userId(),
-                                player.guestPlayerId(),
+                                player.attendanceId(),
                                 player.fullName(),
                                 player.playerHandle(),
                                 player.primaryPositionCode()
@@ -315,7 +315,7 @@ public class MatchesController {
     private RosterPlayerResponse toRosterPlayerResponse(MatchService.RosterPlayerEntry entry) {
         return new RosterPlayerResponse(
                 entry.userId(),
-                entry.guestPlayerId(),
+                entry.attendanceId(),
                 entry.fullName(),
                 entry.email(),
                 entry.playerHandle(),
@@ -345,7 +345,7 @@ public class MatchesController {
     private PairingPlayerResponse toPairingPlayerResponse(MatchPairingService.PairingPlayer player) {
         return new PairingPlayerResponse(
                 player.userId(),
-                player.guestPlayerId(),
+                player.attendanceId(),
                 player.fullName(),
                 player.playerHandle(),
                 player.primaryPositionCode(),
@@ -394,7 +394,7 @@ public class MatchesController {
 
     public record ConfirmedPlayerResponse(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String email,
             String playerHandle
@@ -413,7 +413,7 @@ public class MatchesController {
             @NotNull Integer teamNumber,
             String name,
             List<UUID> playerIds,
-            List<UUID> guestPlayerIds
+            List<UUID> attendanceIds
     ) {
     }
 
@@ -426,7 +426,7 @@ public class MatchesController {
 
     public record TeamPlayerResponse(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String playerHandle,
             String primaryPositionCode
@@ -442,7 +442,7 @@ public class MatchesController {
 
     public record RosterPlayerResponse(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String email,
             String playerHandle,
@@ -469,7 +469,7 @@ public class MatchesController {
 
     public record PairingPlayerResponse(
             UUID userId,
-            UUID guestPlayerId,
+            UUID attendanceId,
             String fullName,
             String playerHandle,
             String primaryPositionCode,
@@ -481,8 +481,8 @@ public class MatchesController {
     public record ManualPairRequest(
             UUID playerAId,
             UUID playerBId,
-            UUID guestPlayerAId,
-            UUID guestPlayerBId,
+            UUID attendanceAId,
+            UUID attendanceBId,
             @NotBlank String positionCode
     ) {
     }

@@ -1,9 +1,9 @@
 package com.sinte.backend.api.v1.attendance;
 
 import com.sinte.backend.config.security.SecurityUtils;
-import com.sinte.backend.domain.MatchAttendance;
+import com.sinte.backend.domain.Attendance;
 import com.sinte.backend.domain.enums.AttendanceStatus;
-import com.sinte.backend.repository.MatchAttendanceRepository;
+import com.sinte.backend.repository.AttendanceRepository;
 import com.sinte.backend.service.AttendanceService;
 import com.sinte.backend.service.dto.AttendanceResponseRequest;
 import jakarta.validation.Valid;
@@ -25,11 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
-    private final MatchAttendanceRepository matchAttendanceRepository;
+    private final AttendanceRepository attendanceRepository;
 
-    public AttendanceController(AttendanceService attendanceService, MatchAttendanceRepository matchAttendanceRepository) {
+    public AttendanceController(AttendanceService attendanceService, AttendanceRepository attendanceRepository) {
         this.attendanceService = attendanceService;
-        this.matchAttendanceRepository = matchAttendanceRepository;
+        this.attendanceRepository = attendanceRepository;
     }
 
     @GetMapping("/match/{matchId}")
@@ -37,7 +37,7 @@ public class AttendanceController {
     public ResponseEntity<List<AttendanceResponse>> byMatch(@PathVariable UUID matchId) {
         UUID userId = SecurityUtils.currentUserId();
         List<AttendanceResponse> attendance = attendanceService.getAttendanceByMatch(matchId, userId).stream()
-                .map(this::toResponse)
+                .map(a -> toResponse(a))
                 .toList();
         return ResponseEntity.ok(attendance);
     }
@@ -46,8 +46,8 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('PLAYER','DT','ADMIN')")
     public ResponseEntity<List<AttendanceResponse>> myAttendance() {
         UUID userId = SecurityUtils.currentUserId();
-        List<AttendanceResponse> attendance = matchAttendanceRepository.findByUserIdForMyAttendanceList(userId).stream()
-                .map(this::toResponse)
+        List<AttendanceResponse> attendance = attendanceRepository.findByUserIdForMyAttendanceList(userId).stream()
+                .map(a -> toResponse(a))
                 .toList();
         return ResponseEntity.ok(attendance);
     }
@@ -56,7 +56,7 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('PLAYER','DT','ADMIN')")
     public ResponseEntity<AttendanceResponse> respond(@Valid @RequestBody AttendanceRespondApiRequest request) {
         UUID userId = SecurityUtils.currentUserId();
-        MatchAttendance updated = attendanceService.respondAttendance(
+        Attendance updated = attendanceService.respondAttendance(
                 new AttendanceResponseRequest(request.matchId(), userId, request.status(), request.comment())
         );
         return ResponseEntity.ok(toResponse(updated));
@@ -66,30 +66,27 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('PLAYER','DT','ADMIN')")
     public ResponseEntity<AttendanceResponse> unconfirm(@Valid @RequestBody AttendanceUnconfirmApiRequest request) {
         UUID userId = SecurityUtils.currentUserId();
-        MatchAttendance updated = attendanceService.unconfirmAttendance(request.matchId(), userId);
+        Attendance updated = attendanceService.unconfirmAttendance(request.matchId(), userId);
         return ResponseEntity.ok(toResponse(updated));
     }
 
-    private AttendanceResponse toResponse(MatchAttendance attendance) {
+    private AttendanceResponse toResponse(Attendance attendance) {
         var match = attendance.getMatch();
-        long confirmedYesCount = matchAttendanceRepository.countByMatchIdAndStatus(
-                match.getId(),
-                AttendanceStatus.YES
-        );
-        long pendingCount = matchAttendanceRepository.countByMatchIdAndStatus(
-                match.getId(),
-                AttendanceStatus.PENDING
-        );
+        long confirmedYesCount = attendanceRepository.countByMatchIdAndStatus(match.getId(), AttendanceStatus.YES);
+        long pendingCount = attendanceRepository.countByMatchIdAndStatus(match.getId(), AttendanceStatus.PENDING);
+        UUID userId = attendance.getUser() != null ? attendance.getUser().getId() : null;
         return new AttendanceResponse(
                 attendance.getId(),
                 match.getId(),
                 match.getTitle(),
                 match.getStartsAt(),
                 match.getStatus().name(),
-                attendance.getUser().getId(),
+                userId,
+                attendance.isExternal(),
+                attendance.getExternalName(),
                 attendance.getStatus().name(),
                 attendance.getRespondedAt(),
-                attendance.getComment(),
+                attendance.getUser() != null ? attendance.getUser().getFullName() : attendance.getExternalName(),
                 match.isAttendanceOpen(),
                 match.getTargetPlayers(),
                 confirmedYesCount,
@@ -116,9 +113,11 @@ public class AttendanceController {
             OffsetDateTime matchStartsAt,
             String matchStatus,
             UUID userId,
+            boolean external,
+            String externalName,
             String status,
             OffsetDateTime respondedAt,
-            String comment,
+            String displayName,
             boolean attendanceOpen,
             Integer targetPlayers,
             long confirmedYesCount,
