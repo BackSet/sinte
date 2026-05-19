@@ -29,8 +29,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     @Query("""
            SELECT DISTINCT m
            FROM Match m
-           JOIN MatchAttendance ma ON ma.match.id = m.id
-           WHERE ma.user.id = :userId
+           JOIN Attendance a ON a.match.id = m.id
+           WHERE a.user.id = :userId
            ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
     List<Match> findUserMatches(@Param("userId") UUID userId);
@@ -38,8 +38,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     @Query("""
            SELECT DISTINCT m
            FROM Match m
-           JOIN MatchAttendance ma ON ma.match.id = m.id
-           WHERE ma.user.id = :userId
+           JOIN Attendance a ON a.match.id = m.id
+           WHERE a.user.id = :userId
              AND m.status = :status
            ORDER BY m.createdAt DESC, m.startsAt DESC
            """)
@@ -51,8 +51,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     @Query("""
            SELECT DISTINCT m
            FROM Match m
-           JOIN MatchAttendance ma ON ma.match.id = m.id
-           WHERE ma.user.id = :userId
+           JOIN Attendance a ON a.match.id = m.id
+           WHERE a.user.id = :userId
              AND (:from IS NULL OR m.startsAt >= :from)
              AND (:to IS NULL OR m.startsAt <= :to)
            ORDER BY m.createdAt DESC, m.startsAt DESC
@@ -66,8 +66,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     @Query("""
            SELECT DISTINCT m
            FROM Match m
-           JOIN MatchAttendance ma ON ma.match.id = m.id
-           WHERE ma.user.id = :userId
+           JOIN Attendance a ON a.match.id = m.id
+           WHERE a.user.id = :userId
              AND (:from IS NULL OR m.startsAt >= :from)
              AND (:to IS NULL OR m.startsAt <= :to)
              AND m.status = :status
